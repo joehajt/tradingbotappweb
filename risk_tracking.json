@@ -1,0 +1,11 @@
+{
+  "daily_losses": {},
+  "weekly_losses": {},
+  "consecutive_losses": 0,
+  "total_trades_today": 0,
+  "last_trade_date": null,
+  "cooling_until": null,
+  "trade_history": [],
+  "margin_alerts": [],
+  "last_margin_check": null
+}
