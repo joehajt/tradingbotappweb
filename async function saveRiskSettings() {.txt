@@ -1,0 +1,3018 @@
+async function saveRiskSettings() {
+            const settings = {
+                risk_management_enabled: document.getElementById('risk-management-enabled').checked,
+                daily_loss_limit: parseFloat(document.getElementById('daily-loss-limit').value),
+                weekly_loss_limit: parseFloat(document.getElementById('weekly-loss-limit').value),
+                max_consecutive_losses: parseInt(document.getElementById('max-consecutive-losses').value),
+                min_margin_level: parseFloat(document.getElementById('min-margin-level').value)
+            };
+
+            try {
+                await apiRequest('risk-settings', 'POST', settings);
+                showNotification('✅ Risk Management settings saved!', 'success');
+                loadRiskStats();
+            } catch (error) {
+                console.error('Error saving risk settings:', error);
+            }
+        }
+
+        async function resetRiskLimits() {
+            if (!confirm('Reset daily and weekly loss limits?')) return;
+            
+            try {
+                await apiRequest('console/command', 'POST', { command: 'risk.reset' });
+                showNotification('✅ Risk limits reset', 'success');
+                loadRiskStats();
+            } catch (error) {
+                console.error('Error resetting limits:', error);
+            }
+        }
+
+        async function checkMarginLevel() {
+            try {
+                const result = await apiRequest('console/command', 'POST', { command: 'risk.margin' });
+                showNotification(result.message, 'info');
+                loadRiskStats();
+            } catch (error) {
+                console.error('Error checking margin:', error);
+            }
+        }
+
+        // PROFILE FUNCTIONS
+        async function saveProfile() {
+            const name = document.getElementById('profile-name').value.trim();
+            if (!name) {
+                showNotification('❌ Wprowadź nazwę profilu', 'error');
+                return;
+            }
+
+            try {
+                await apiRequest('profiles', 'POST', { name });
+                showNotification(`✅ Profil '${name}' zapisany!`, 'success');
+                document.getElementById('profile-name').value = '';
+                refreshProfiles();
+            } catch (error) {
+                console.error('Error saving profile:', error);
+            }
+        }
+
+        async function refreshProfiles() {
+            try {
+                const result = await apiRequest('profiles');
+                const tbody = document.getElementById('profiles-list');
+                tbody.innerHTML = '';
+
+                if (result.profiles && Object.keys(result.profiles).length > 0) {
+                    Object.entries(result.profiles).forEach(([name, data]) => {
+                        const row = tbody.insertRow();
+                        const riskEnabled = data.config?.risk_management_enabled ? '✅' : '❌';
+                        const platform = data.config?.bybit_platform === 'testnet' ? '🎮 Testnet' : '💰 Mainnet';
+                        const mode = data.config?.use_demo_account ? '🎮 Demo' : '💰 Live';
+                        
+                        row.innerHTML = `
+                            <td>${name}</td>
+                            <td>${new Date(data.timestamp).toLocaleString('pl-PL')}</td>
+                            <td>${platform}</td>
+                            <td>${mode}</td>
+                            <td>${riskEnabled}</td>
+                            <td>
+                                <button class="btn btn-success btn-sm" onclick="loadProfile('${name}')">🔥 Wczytaj</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteProfile('${name}')">🗑️ Usuń</button>
+                            </td>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Brak zapisanych profili</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading profiles:', error);
+            }
+        }
+
+        async function loadProfile(name) {
+            if (!confirm(`Wczytać profil '${name}'?`)) return;
+
+            try {
+                await apiRequest(`profiles/${name}/load`, 'POST');
+                showNotification(`✅ Profil '${name}' wczytany!`, 'success');
+                await loadConfig();
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        }
+
+        async function deleteProfile(name) {
+            if (!confirm(`Usunąć profil '${name}'?`)) return;
+
+            try {
+                await apiRequest(`profiles/${name}`, 'DELETE');
+                showNotification(`✅ Profil '${name}' usunięty!`, 'success');
+                refreshProfiles();
+            } catch (error) {
+                console.error('Error deleting profile:', error);
+            }
+        }
+
+        // SIGNAL FUNCTIONS
+        async function parseSignal() {
+            const signalText = document.getElementById('signal-input').value.trim();
+            if (!signalText) {
+                showNotification('❌ Wprowadź sygnał', 'error');
+                return;
+            }
+
+            try {
+                const result = await apiRequest('parse-signal', 'POST', { signal_text: signalText });
+                if (result.success) {
+                    lastSignal = result.signal;
+                    displaySignalResult(result.signal, result.analysis);
+                    document.getElementById('execute-signal-btn').disabled = false;
+                } else {
+                    showNotification('❌ ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error parsing signal:', error);
+            }
+        }
+
+        function displaySignalResult(signal, analysis) {
+            let html = `
+                <div class="console-success">✅ SYGNAŁ ROZPOZNANY!</div>
+                <div class="console-info">
+                📊 <strong>Symbol:</strong> ${signal.symbol}<br>
+                📈 <strong>Typ:</strong> ${signal.position_type.toUpperCase()}<br>
+                💰 <strong>Wejście:</strong> ${signal.entry_price}<br>
+                🛑 <strong>Stop Loss:</strong> ${signal.stop_loss || 'Brak'}<br>
+                🎯 <strong>Targety:</strong> ${Object.keys(signal.targets).length}<br><br>
+                </div>
+            `;
+
+            if (signal.targets && Object.keys(signal.targets).length > 0) {
+                html += '<div class="console-warning">🎯 TARGETS:</div>';
+                Object.entries(signal.targets).forEach(([num, price]) => {
+                    html += `<div class="console-info">   Target ${num}: ${price}</div>`;
+                });
+                html += '<br>';
+            }
+
+            html += `<div class="console-info">${analysis.replace(/\n/g, '<br>')}</div>`;
+            
+            document.getElementById('signal-result').innerHTML = html;
+        }
+
+        async function executeSignal() {
+            if (!lastSignal) {
+                showNotification('❌ Brak sygnału do wykonania', 'error');
+                return;
+            }
+
+            const mode = document.getElementById('mode-demo').checked ? '🎮 DEMO' : '💰 LIVE';
+            
+            if (!confirm(`${mode} TRADING\n\nWykonać trade dla ${lastSignal.symbol}?`)) return;
+
+            try {
+                const result = await apiRequest('execute-trade', 'POST', { signal: lastSignal });
+                showNotification(result.message, result.success ? 'success' : 'error');
+                
+                if (result.success) {
+                    refreshPositions();
+                    loadRiskStats();
+                }
+            } catch (error) {
+                console.error('Error executing signal:', error);
+            }
+        }
+
+        function clearSignal() {
+            document.getElementById('signal-input').value = '';
+            document.getElementById('signal-result').innerHTML = '<div class="console-info">[INFO] Wklej sygnał i kliknij "Analizuj Sygnał"</div>';
+            document.getElementById('execute-signal-btn').disabled = true;
+            lastSignal = null;
+        }
+
+        // TELEGRAM BOT FUNCTIONS
+        async function startTelegram() {
+            try {
+                const autoExecute = document.getElementById('auto-execute').checked;
+                await apiRequest('telegram/start', 'POST', { auto_execute: autoExecute });
+                document.getElementById('telegram-status').className = 'status-badge status-online';
+                document.getElementById('telegram-status').textContent = '🟢 Bot Aktywny';
+                showNotification('✅ Bot Telegram uruchomiony!', 'success');
+            } catch (error) {
+                console.error('Error starting Telegram bot:', error);
+            }
+        }
+
+        async function stopTelegram() {
+            try {
+                await apiRequest('telegram/stop', 'POST');
+                document.getElementById('telegram-status').className = 'status-badge status-offline';
+                document.getElementById('telegram-status').textContent = '🔴 Bot Nieaktywny';
+                showNotification('🛑 Bot Telegram zatrzymany', 'info');
+            } catch (error) {
+                console.error('Error stopping Telegram bot:', error);
+            }
+        }
+
+        // FORWARDER FUNCTIONS
+        function validateForwarderConfig() {
+            let isValid = true;
+            
+            document.querySelectorAll('.validation-error').forEach(el => {
+                el.textContent = '';
+                el.classList.remove('show');
+            });
+
+            const apiId = document.getElementById('forwarder-api-id').value.trim();
+            const apiHash = document.getElementById('forwarder-api-hash').value.trim();
+            const phone = document.getElementById('forwarder-phone').value.trim();
+
+            if (!apiId) {
+                document.getElementById('api-id-error').textContent = 'API ID jest wymagane';
+                document.getElementById('api-id-error').classList.add('show');
+                isValid = false;
+            }
+
+            if (!apiHash) {
+                document.getElementById('api-hash-error').textContent = 'API Hash jest wymagane';
+                document.getElementById('api-hash-error').classList.add('show');
+                isValid = false;
+            }
+
+            if (!phone) {
+                document.getElementById('phone-error').textContent = 'Numer telefonu jest wymagany';
+                document.getElementById('phone-error').classList.add('show');
+                isValid = false;
+            } else if (!phone.startsWith('+')) {
+                document.getElementById('phone-error').textContent = 'Numer musi zaczynać się od + i kodu kraju';
+                document.getElementById('phone-error').classList.add('show');
+                isValid = false;
+            }
+
+            return isValid;
+        }
+
+        async function saveForwarderConfig() {
+            if (!validateForwarderConfig()) {
+                return;
+            }
+
+            const config = {
+                api_id: document.getElementById('forwarder-api-id').value.trim(),
+                api_hash: document.getElementById('forwarder-api-hash').value.trim(),
+                phone_number: document.getElementById('forwarder-phone').value.trim(),
+                target_chat_id: document.getElementById('forwarder-target-chat').value.trim()
+            };
+
+            try {
+                await apiRequest('forwarder/config', 'POST', config);
+                forwarderConfigured = true;
+                forwarderSteps.config = true;
+                updateForwarderSteps();
+                
+                const statusEl = document.getElementById('config-save-status');
+                statusEl.style.display = 'inline';
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 3000);
+                
+                showNotification('✅ Konfiguracja zapisana!', 'success');
+            } catch (error) {
+                console.error('Error saving forwarder config:', error);
+            }
+        }
+
+        async function getChannels() {
+            if (!forwarderConfigured) {
+                showNotification('❌ Najpierw zapisz konfigurację!', 'error');
+                return;
+            }
+
+            document.getElementById('channels-loading').style.display = 'block';
+            document.getElementById('get-channels-btn').disabled = true;
+
+            try {
+                const result = await apiRequest('forwarder/channels');
+                
+                if (result.auth_required) {
+                    showAuthModal(result.auth_type);
+                } else if (result.channels) {
+                    displayChannels(result.channels);
+                    document.getElementById('channels-section').style.display = 'block';
+                    forwarderSteps.auth = true;
+                    updateForwarderSteps();
+                }
+            } catch (error) {
+                console.error('Error getting channels:', error);
+            } finally {
+                document.getElementById('channels-loading').style.display = 'none';
+                document.getElementById('get-channels-btn').disabled = false;
+            }
+        }
+
+        function displayChannels(channels) {
+            const channelsList = document.getElementById('channels-list');
+            channelsList.innerHTML = '';
+
+            channels.forEach(channel => {
+                const card = document.createElement('div');
+                card.className = 'channel-card';
+                card.innerHTML = `
+                    <div class="channel-info">
+                        <div class="channel-name">${channel.title}</div>
+                        <div class="channel-meta">ID: ${channel.id} • ${channel.type}</div>
+                    </div>
+                    <input type="checkbox" class="channel-checkbox" value="${channel.id}" style="width: 20px; height: 20px; cursor: pointer;">
+                `;
+                channelsList.appendChild(card);
+            });
+        }
+
+        async function saveMonitoredChannels() {
+            const checkboxes = document.querySelectorAll('.channel-checkbox:checked');
+            const channelIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+            if (channelIds.length === 0) {
+                showNotification('❌ Wybierz przynajmniej jeden kanał', 'error');
+                return;
+            }
+
+            try {
+                await apiRequest('forwarder/channels', 'POST', { channel_ids: channelIds });
+                forwarderSteps.channels = true;
+                updateForwarderSteps();
+                showNotification(`✅ Zapisano ${channelIds.length} kanałów!`, 'success');
+                loadMonitoredChannels();
+            } catch (error) {
+                console.error('Error saving channels:', error);
+            }
+        }
+
+        async function loadMonitoredChannels() {
+            try {
+                const result = await apiRequest('forwarder/monitored-channels');
+                const display = document.getElementById('monitored-channels-display');
+                
+                if (result.channels && result.channels.length > 0) {
+                    display.innerHTML = result.channels.map(ch => 
+                        `<div class="console-info">📺 ${ch}</div>`
+                    ).join('');
+                } else {
+                    display.innerHTML = '<div class="console-info">[INFO] Brak wybranych kanałów</div>';
+                }
+            } catch (error) {
+                console.error('Error loading monitored channels:', error);
+            }
+        }
+
+        async function startForwarder() {
+            try {
+                await apiRequest('forwarder/start', 'POST');
+                document.getElementById('forwarder-status').className = 'status-badge status-online';
+                document.getElementById('forwarder-status').textContent = '🟢 Forwarder Aktywny';
+                forwarderSteps.running = true;
+                updateForwarderSteps();
+                showNotification('✅ Forwarder uruchomiony!', 'success');
+            } catch (error) {
+                console.error('Error starting forwarder:', error);
+            }
+        }
+
+        async function stopForwarder() {
+            try {
+                await apiRequest('forwarder/stop', 'POST');
+                document.getElementById('forwarder-status').className = 'status-badge status-offline';
+                document.getElementById('forwarder-status').textContent = '🔴 Forwarder Zatrzymany';
+                forwarderSteps.running = false;
+                updateForwarderSteps();
+                showNotification('🛑 Forwarder zatrzymany', 'info');
+            } catch (error) {
+                console.error('Error stopping forwarder:', error);
+            }
+        }
+
+        function updateForwarderSteps() {
+            const steps = {
+                1: forwarderSteps.config,
+                2: forwarderSteps.auth,
+                3: forwarderSteps.channels,
+                4: forwarderSteps.running
+            };
+            
+            for (let i = 1; i <= 4; i++) {
+                const stepElement = document.getElementById(`step-${i}`);
+                if (stepElement) {
+                    stepElement.classList.remove('completed', 'active');
+                    
+                    if (steps[i]) {
+                        stepElement.classList.add('completed');
+                    } else if (i === Object.values(steps).filter(v => v).length + 1) {
+                        stepElement.classList.add('active');
+                    }
+                }
+            }
+        }
+
+        // CONSOLE FUNCTIONS
+        function startConsoleRedirect() {
+            consoleRedirectActive = true;
+            document.getElementById('console-status').className = 'alert alert-success';
+            document.getElementById('console-status').textContent = '🟢 Console Output: Active';
+            addConsoleMessage('🟢 Console output redirection STARTED', 'success');
+        }
+
+        function stopConsoleRedirect() {
+            consoleRedirectActive = false;
+            document.getElementById('console-status').className = 'alert alert-info';
+            document.getElementById('console-status').textContent = '🔴 Console Output: Inactive';
+            addConsoleMessage('🔴 Console output redirection STOPPED', 'warning');
+        }
+
+        function clearConsole() {
+            document.getElementById('console-output').innerHTML = '';
+            addConsoleMessage('🧹 Console cleared', 'info');
+        }
+
+        function exportConsoleLog() {
+            const content = document.getElementById('console-output').innerText;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `console-log-${new Date().toISOString()}.txt`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            addConsoleMessage('💾 Console log exported', 'success');
+        }
+
+        function addConsoleMessage(message, type = 'info') {
+            const consoleOutput = document.getElementById('console-output');
+            const line = document.createElement('div');
+            line.className = `console-${type}`;
+            line.textContent = message;
+            consoleOutput.appendChild(line);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        async function connectTelethonConsole() {
+            try {
+                const response = await fetch('/api/console/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: 'telethon.connect' })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    telethonConnected = true;
+                    document.getElementById('telethon-status-console').className = 'status-badge status-online';
+                    document.getElementById('telethon-status-console').textContent = '🟢 Telethon Online';
+                    document.getElementById('telethon-connect-btn').style.display = 'none';
+                    document.getElementById('telethon-disconnect-btn').style.display = 'inline-block';
+                    addConsoleMessage('✅ Telethon connected successfully!', 'success');
+                } else {
+                    addConsoleMessage('❌ ' + data.error, 'error');
+                }
+            } catch (error) {
+                addConsoleMessage('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        async function disconnectTelethonConsole() {
+            try {
+                const response = await fetch('/api/console/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: 'telethon.disconnect' })
+                });
+                
+                telethonConnected = false;
+                document.getElementById('telethon-status-console').className = 'status-badge status-offline';
+                document.getElementById('telethon-status-console').textContent = '🔴 Telethon Offline';
+                document.getElementById('telethon-connect-btn').style.display = 'inline-block';
+                document.getElementById('telethon-disconnect-btn').style.display = 'none';
+                addConsoleMessage('✅ Telethon disconnected', 'info');
+            } catch (error) {
+                addConsoleMessage('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        function handleConsoleKey(event) {
+            if (event.key === 'Enter') {
+                executeConsoleCommand();
+            }
+        }
+
+        async function executeConsoleCommand() {
+            const input = document.getElementById('console-command');
+            const command = input.value.trim();
+            
+            if (!command) return;
+
+            addConsoleMessage(`$ ${command}`, 'info');
+            input.value = '';
+
+            if (command === 'clear') {
+                clearConsole();
+                return;
+            }
+
+            if (command === 'help') {
+                addConsoleMessage('Available commands: help, clear, bot.balance, bot.positions, risk.status, forwarder.status, telethon.connect, telethon.disconnect', 'info');
+                return;
+            }
+
+            try {
+                const result = await apiRequest('console/command', 'POST', { command });
+                addConsoleMessage(result.message, result.success ? 'success' : 'error');
+            } catch (error) {
+                addConsoleMessage('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        // POSITIONS FUNCTIONS
+        async function refreshPositions() {
+            try {
+                const result = await apiRequest('positions');
+                const tbody = document.getElementById('positions-list');
+                tbody.innerHTML = '';
+
+                if (result.positions && result.positions.length > 0) {
+                    result.positions.forEach(pos => {
+                        const row = tbody.insertRow();
+                        const pnlClass = pos.unrealisedPnl >= 0 ? 'console-success' : 'console-error';
+                        
+                        row.innerHTML = `
+                            <td>${pos.symbol}</td>
+                            <td>${pos.side}</td>
+                            <td>${pos.size}</td>
+                            <td>${pos.entryPrice}</td>
+                            <td>${pos.markPrice}</td>
+                            <td class="${pnlClass}">${pos.unrealisedPnl}</td>
+                            <td>${pos.stopLoss || '-'}</td>
+                            <td>
+                                <button class="btn btn-primary btn-sm" onclick="setBreakeven('${pos.symbol}')">💡 Breakeven</button>
+                                <button class="btn btn-danger btn-sm" onclick="closePosition('${pos.symbol}')">❌ Close</button>
+                            </td>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Brak aktywnych pozycji</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading positions:', error);
+            }
+        }
+
+        async function startMonitoring() {
+            try {
+                await apiRequest('positions/start-monitoring', 'POST');
+                showNotification('✅ Monitoring uruchomiony!', 'success');
+            } catch (error) {
+                console.error('Error starting monitoring:', error);
+            }
+        }
+
+        async function stopMonitoring() {
+            try {
+                await apiRequest('positions/stop-monitoring', 'POST');
+                showNotification('🛑 Monitoring zatrzymany', 'info');
+            } catch (error) {
+                console.error('Error stopping monitoring:', error);
+            }
+        }
+
+        async function setBreakeven(symbol) {
+            try {
+                await apiRequest('positions/breakeven', 'POST', { symbol });
+                showNotification(`✅ Breakeven ustawiony dla ${symbol}`, 'success');
+                refreshPositions();
+            } catch (error) {
+                console.error('Error setting breakeven:', error);
+            }
+        }
+
+        async function closePosition(symbol) {
+            if (!confirm(`Zamknąć pozycję ${symbol}?`)) return;
+
+            try {
+                await apiRequest('positions/close', 'POST', { symbol });
+                showNotification(`✅ Pozycja ${symbol} zamknięta`, 'success');
+                refreshPositions();
+            } catch (error) {
+                console.error('Error closing position:', error);
+            }
+        }
+
+        async function manualBreakeven() {
+            const symbol = document.getElementById('manual-symbol').value.trim();
+            if (!symbol) {
+                showNotification('❌ Wprowadź symbol', 'error');
+                return;
+            }
+            await setBreakeven(symbol);
+        }
+
+        async function manualClosePosition() {
+            const symbol = document.getElementById('manual-symbol').value.trim();
+            if (!symbol) {
+                showNotification('❌ Wprowadź symbol', 'error');
+                return;
+            }
+            await closePosition(symbol);
+        }
+
+        // LOGS FUNCTIONS
+        async function refreshLogs() {
+            try {
+                const result = await apiRequest('logs');
+                const logsOutput = document.getElementById('logs-output');
+                logsOutput.innerHTML = '';
+
+                if (result.logs && result.logs.length > 0) {
+                    result.logs.forEach(log => {
+                        const line = document.createElement('div');
+                        line.className = 'console-info';
+                        line.textContent = log;
+                        logsOutput.appendChild(line);
+                    });
+                    logsOutput.scrollTop = logsOutput.scrollHeight;
+                } else {
+                    logsOutput.innerHTML = '<div class="console-info">[INFO] Brak logów</div>';
+                }
+            } catch (error) {
+                console.error('Error loading logs:', error);
+            }
+        }
+
+        async function clearLogs() {
+            if (!confirm('Wyczyścić wszystkie logi?')) return;
+
+            try {
+                await apiRequest('logs', 'DELETE');
+                showNotification('✅ Logi wyczyszczone', 'success');
+                refreshLogs();
+            } catch (error) {
+                console.error('Error clearing logs:', error);
+            }
+        }
+
+        async function exportLogs() {
+            try {
+                const result = await apiRequest('logs');
+                if (result.logs) {
+                    const content = result.logs.join('\n');
+                    const blob = new Blob([content], { type: 'text/plain' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `trading-bot-logs-${new Date().toISOString()}.txt`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    showNotification('💾 Logi wyeksportowane', 'success');
+                }
+            } catch (error) {
+                console.error('Error exporting logs:', error);
+            }
+        }
+
+        // MODAL FUNCTIONS
+        function showAuthModal(authType) {
+            const modal = document.getElementById('authModal');
+            const message = document.getElementById('auth-message');
+            const input = document.getElementById('auth-input');
+            
+            input.value = '';
+            document.getElementById('auth-error').style.display = 'none';
+            
+            if (authType === 'code') {
+                message.textContent = '📱 Wprowadź kod weryfikacyjny z Telegram:';
+                input.placeholder = 'Wprowadź 5-cyfrowy kod';
+                input.type = 'text';
+            } else if (authType === 'password') {
+                message.textContent = '🔐 Wprowadź hasło 2FA:';
+                input.placeholder = 'Wprowadź hasło';
+                input.type = 'password';
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        async function submitAuth() {
+            const authValue = document.getElementById('auth-input').value.trim();
+            
+            if (!authValue) {
+                document.getElementById('auth-error').textContent = 'Wprowadź wartość';
+                document.getElementById('auth-error').style.display = 'block';
+                return;
+            }
+
+            try {
+                const result = await apiRequest('forwarder/auth', 'POST', { auth_value: authValue });
+                
+                if (result.success) {
+                    closeModal('authModal');
+                    showNotification('✅ Autoryzacja pomyślna!', 'success');
+                    
+                    if (result.channels) {
+                        displayChannels(result.channels);
+                        document.getElementById('channels-section').style.display = 'block';
+                        forwarderSteps.auth = true;
+                        updateForwarderSteps();
+                    }
+                } else {
+                    document.getElementById('auth-error').textContent = result.error;
+                    document.getElementById('auth-error').style.display = 'block';
+                }
+            } catch (error) {
+                document.getElementById('auth-error').textContent = error.message;
+                document.getElementById('auth-error').style.display = 'block';
+            }
+        }
+
+        // NOTIFICATION SYSTEM
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 600;
+                z-index: 10000;
+                animation: slideInNotif 0.3s ease-out;
+                max-width: 400px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            `;
+
+            let bgColor;
+            switch(type) {
+                case 'success':
+                    bgColor = '#10B981';
+                    break;
+                case 'error':
+                    bgColor = '#EF4444';
+                    break;
+                case 'warning':
+                    bgColor = '#F59E0B';
+                    break;
+                default:
+                    bgColor = '#3B82F6';
+            }
+
+            notification.style.background = bgColor;
+            notification.textContent = message;
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.animation = 'slideOutNotif 0.3s ease-out';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInNotif {
+                from {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            @keyframes slideOutNotif {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Utility functions
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleDateString('pl-PL') + ' ' + date.toLocaleTimeString('pl-PL');
+        }
+
+        // Window click event for modals
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🚀 Trading Bot Pro - Starting...');
+            
+            // Load initial data
+            await loadConfig();
+            
+            // Start cockpit refresh
+            refreshCockpitStatus();
+            startCockpitRefresh();
+            
+            console.log('✅ Application ready');
+        });
+    </script>
+</body>
+</html>                        <input type="text" id="forwarder-target-chat" class="form-control" placeholder="Opcjonalne - domyślnie używa Chat ID bota">
+                        <small style="color: var(--text-secondary);">Zostaw puste dla domyślnego</small>
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-success" onclick="saveForwarderConfig()">💾 Zapisz Konfigurację</button>
+                        <span id="config-save-status" style="margin-left: 10px; color: var(--success-color); display: none; font-weight: 600;">✅ Zapisano!</span>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">🔍 Krok 2: Autoryzacja i Pobieranie Kanałów</h3>
+                    
+                    <div class="alert alert-warning">
+                        <strong>⚠️ WAŻNE:</strong> Najpierw zapisz konfigurację API powyżej!<br>
+                        🔐 Przy pierwszym użyciu pojawi się prośba o kod z Telegram<br>
+                        ✅ Kolejne połączenia NIE będą wymagały kodu (persistent session)
+                    </div>
+                    
+                    <button class="btn btn-info" onclick="getChannels()" id="get-channels-btn">
+                        📺 Pobierz Listę Kanałów
+                    </button>
+                    
+                    <div id="channels-loading" style="display: none; margin-top: 20px;">
+                        <div class="loader"></div>
+                        <p style="text-align: center; color: var(--text-secondary);">Łączenie z Telegram...</p>
+                    </div>
+                </div>
+
+                <div class="section" id="channels-section" style="display: none;">
+                    <h3 class="section-title">📺 Krok 3: Wybór Kanałów do Monitorowania</h3>
+                    <div id="channels-list" class="scrollable-frame" style="max-height: 400px;"></div>
+                    <button class="btn btn-success" onclick="saveMonitoredChannels()" style="margin-top: 15px;">
+                        💾 Zapisz Wybrane Kanały
+                    </button>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">🎯 Krok 4: Start Forwarder</h3>
+                    <div class="grid-2">
+                        <div class="section">
+                            <h4 style="color: var(--primary-color); margin-bottom: 15px;">📊 Status</h4>
+                            <div id="forwarder-status" class="status-badge status-offline">
+                                🔴 Forwarder Zatrzymany
+                            </div>
+                        </div>
+                        
+                        <div class="section">
+                            <h4 style="color: var(--primary-color); margin-bottom: 15px;">🎮 Kontrola</h4>
+                            <button class="btn btn-success" onclick="startForwarder()">▶️ Start Forwarder</button>
+                            <button class="btn btn-danger" onclick="stopForwarder()">⏹️ Stop Forwarder</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">📋 Monitorowane Kanały</h3>
+                    <div id="monitored-channels-display" class="console">
+                        <div class="console-info">[INFO] Brak wybranych kanałów</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONSOLE TAB -->
+        <div id="console" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">💻 DEVELOPER CONSOLE</h2>
+                
+                <div class="section">
+                    <h3 class="section-title">🎮 Console Controls</h3>
+                    <div style="margin-bottom: 10px;">
+                        <button class="btn btn-success" onclick="startConsoleRedirect()">🟢 Start Output</button>
+                        <button class="btn btn-danger" onclick="stopConsoleRedirect()">🔴 Stop Output</button>
+                        <button class="btn btn-warning" onclick="clearConsole()">🧹 Clear Console</button>
+                        <button class="btn btn-info" onclick="exportConsoleLog()">💾 Export Log</button>
+                        
+                        <button class="btn btn-primary" onclick="connectTelethonConsole()" id="telethon-connect-btn">📱 Connect Telethon</button>
+                        <button class="btn btn-danger" onclick="disconnectTelethonConsole()" id="telethon-disconnect-btn" style="display: none;">🔴 Disconnect Telethon</button>
+                        <span id="telethon-status-console" class="status-badge status-offline" style="margin-left: 10px;">🔴 Telethon Offline</span>
+                    </div>
+                    
+                    <div id="console-status" class="alert alert-info">
+                        🔴 Console Output: Inactive
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">💻 Console Output</h3>
+                    <div id="console-output" class="console">
+                        <div class="console-success">[SYSTEM] 💻 Developer Console Ready</div>
+                        <div class="console-info">[SYSTEM] 📋 Type 'help' for available commands</div>
+                        <div class="console-info">[SYSTEM] 🚀 Enhanced features enabled</div>
+                        <div class="console-telethon">[TELETHON] 📱 Click 'Connect Telethon' to establish Telegram connection</div>
+                    </div>
+                    
+                    <div class="console-input">
+                        <span style="color: var(--success-color); font-family: 'Monaco', monospace;">gt; </span>
+                        <input type="text" id="console-command" placeholder="Enter command..." onkeypress="handleConsoleKey(event)">
+                        <button class="btn btn-primary" onclick="executeConsoleCommand()">⚡ Execute</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">📋 Available Commands</h3>
+                    <pre style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; font-size: 13px; overflow-x: auto; color: var(--text-primary);">
+🔧 SYSTEM:
+  • help - show available commands
+  • clear - clear console
+  • bot.balance - check account balance
+  • bot.positions - show active positions
+  • bot.test_api - test API connection
+
+📊 RISK MANAGEMENT:
+  • risk.status - show risk management status
+  • risk.reset - reset daily/weekly limits
+  • risk.margin - check current margin level
+
+🔧 FORWARDER:
+  • forwarder.status - forwarder status
+  • forwarder.start - start forwarder
+  • forwarder.stop - stop forwarder
+  • forwarder.channels - list monitored channels
+
+📱 TELETHON (NEW):
+  • telethon.connect - connect to Telegram via Telethon
+  • telethon.disconnect - disconnect from Telethon
+  • telethon.status - check Telethon connection status
+  • telethon.channels - list available channels via Telethon
+  • telethon.session - show current session info
+                    </pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- POSITIONS TAB -->
+        <div id="positions" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">🎯 ZARZĄDZANIE POZYCJAMI I BREAKEVEN</h2>
+                
+                <div class="section">
+                    <h3 class="section-title">🎮 Panel Kontrolny</h3>
+                    <button class="btn btn-primary" onclick="refreshPositions()">🔄 Odśwież Pozycje</button>
+                    <button class="btn btn-success" onclick="startMonitoring()">🎯 Start Monitoring</button>
+                    <button class="btn btn-danger" onclick="stopMonitoring()">🛑 Stop Monitoring</button>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">📊 Aktywne Pozycje</h3>
+                    <div class="scrollable-frame">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Typ</th>
+                                    <th>Rozmiar</th>
+                                    <th>Entry Price</th>
+                                    <th>Current Price</th>
+                                    <th>PnL</th>
+                                    <th>Breakeven</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody id="positions-list">
+                                <tr><td colspan="8" style="text-align: center;">Brak aktywnych pozycji</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">🔧 Ręczne Zarządzanie</h3>
+                    <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                        <div class="form-group" style="flex: 1; min-width: 200px; margin: 0;">
+                            <label for="manual-symbol">Symbol:</label>
+                            <input type="text" id="manual-symbol" class="form-control" placeholder="np. BTCUSDT">
+                        </div>
+                        <button class="btn btn-primary" onclick="manualBreakeven()">💡 Set Breakeven</button>
+                        <button class="btn btn-danger" onclick="manualClosePosition()">❌ Close Position</button>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>💡 Funkcje Auto-Breakeven:</strong><br>
+                    • System automatycznie przesunie Stop Loss na breakeven po osiągnięciu wybranego TP<br>
+                    • Chroni przed stratą po osiągnięciu zysku<br>
+                    • Można ustawić po którym TP ma się włączyć (domyślnie: TP3)
+                </div>
+            </div>
+        </div>
+
+        <!-- LOGS TAB -->
+        <div id="logs" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">📝 LOGI SYSTEMOWE</h2>
+                
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-primary" onclick="refreshLogs()">🔄 Odśwież Logi</button>
+                    <button class="btn btn-danger" onclick="clearLogs()">🗑️ Wyczyść Logi</button>
+                    <button class="btn btn-info" onclick="exportLogs()">💾 Eksportuj do Pliku</button>
+                </div>
+                
+                <div class="section">
+                    <h3 class="section-title">📄 Historia Działań</h3>
+                    <div id="logs-output" class="console" style="height: 500px;">
+                        <div class="console-info">[INFO] Kliknij "Odśwież Logi" aby załadować logi</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODALS -->
+    <div id="authModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔐 Autoryzacja Telegram</h2>
+                <span class="modal-close" onclick="closeModal('authModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="auth-message" style="margin-bottom: 20px;">Wprowadź dane autoryzacyjne</p>
+                <div class="form-group">
+                    <input type="text" id="auth-input" class="form-control" placeholder="Wprowadź kod lub hasło" autocomplete="off">
+                </div>
+                <div id="auth-error" class="alert alert-danger" style="display: none; margin-top: 10px;"></div>
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-success" onclick="submitAuth()">✅ Potwierdź</button>
+                    <button class="btn btn-danger" onclick="closeModal('authModal')">❌ Anuluj</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loader"></div>
+            <h3 id="loading-title">Ładowanie...</h3>
+            <p id="loading-message">Proszę czekać...</p>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let config = {};
+        let lastSignal = null;
+        let currentBalance = null;
+        let forwarderConfigured = false;
+        let forwarderSteps = {
+            config: false,
+            auth: false,
+            channels: false,
+            running: false
+        };
+        let riskData = {
+            daily_loss: 0,
+            weekly_loss: 0,
+            consecutive_losses: 0,
+            margin_level: null
+        };
+        let telethonConnected = false;
+        let consoleRedirectActive = false;
+        let cockpitRefreshInterval = null;
+
+        // Socket.IO connection
+        const socket = io();
+        
+        socket.on('connect', () => {
+            console.log('✅ Socket.IO connected');
+            addConsoleMessage('✅ Socket.IO connected', 'success');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('❌ Socket.IO disconnected');
+            addConsoleMessage('❌ Socket.IO disconnected', 'error');
+        });
+
+        socket.on('console_output', (data) => {
+            if (consoleRedirectActive) {
+                addConsoleMessage(data.message, data.type);
+            }
+        });
+
+        socket.on('status_update', (data) => {
+            console.log('Status update:', data);
+        });
+
+        // API Request Helper
+        async function apiRequest(endpoint, method = 'GET', data = null) {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            try {
+                const response = await fetch(`/api/${endpoint}`, options);
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || `API request failed: ${response.status}`);
+                }
+
+                return result;
+            } catch (error) {
+                console.error('API request error:', error);
+                showNotification(`Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // Tab Switching
+        function switchTab(tabName) {
+            const tabs = document.querySelectorAll('.tab-content');
+            const buttons = document.querySelectorAll('.tab-button');
+            
+            tabs.forEach(tab => tab.classList.remove('active'));
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            event.currentTarget.classList.add('active');
+            
+            if (tabName === 'cockpit') {
+                refreshCockpitStatus();
+                startCockpitRefresh();
+            } else {
+                stopCockpitRefresh();
+            }
+
+            loadTabData(tabName);
+        }
+
+        function loadTabData(tabName) {
+            switch (tabName) {
+                case 'profiles':
+                    refreshProfiles();
+                    break;
+                case 'positions':
+                    refreshPositions();
+                    break;
+                case 'logs':
+                    refreshLogs();
+                    break;
+                case 'risk':
+                    loadRiskStats();
+                    break;
+                case 'config':
+                    loadConfig();
+                    break;
+                case 'forwarder':
+                    updateForwarderSteps();
+                    loadMonitoredChannels();
+                    break;
+            }
+        }
+
+        // COCKPIT FUNCTIONS
+        function startCockpitRefresh() {
+            if (cockpitRefreshInterval) {
+                clearInterval(cockpitRefreshInterval);
+            }
+            cockpitRefreshInterval = setInterval(refreshCockpitStatus, 3000);
+        }
+
+        function stopCockpitRefresh() {
+            if (cockpitRefreshInterval) {
+                clearInterval(cockpitRefreshInterval);
+                cockpitRefreshInterval = null;
+            }
+        }
+
+        async function refreshCockpitStatus() {
+            try {
+                const response = await fetch('/api/cockpit/status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateConsoleStatus(data.console);
+                    updateTelegramStatus(data.telegram);
+                    updateForwarderStatus(data.forwarder);
+                }
+            } catch (error) {
+                console.error('Cockpit refresh error:', error);
+            }
+        }
+
+        function updateConsoleStatus(consoleStatus) {
+            const indicator = document.getElementById('cockpit-console-indicator');
+            const badge = document.getElementById('cockpit-console-badge');
+            const outputStatus = document.getElementById('cockpit-output-status');
+            const telethonStatus = document.getElementById('cockpit-telethon-status');
+
+            const isOnline = consoleStatus.output_running || consoleStatus.telethon_connected;
+            
+            if (isOnline) {
+                indicator.className = 'cockpit-status-indicator online';
+                badge.className = 'status-badge online';
+                badge.textContent = 'Online';
+            } else {
+                indicator.className = 'cockpit-status-indicator offline';
+                badge.className = 'status-badge offline';
+                badge.textContent = 'Offline';
+            }
+
+            outputStatus.textContent = consoleStatus.output_running ? 'Running ✅' : 'Stopped';
+            telethonStatus.textContent = consoleStatus.telethon_connected ? 'Connected ✅' : 'Disconnected';
+        }
+
+        function updateTelegramStatus(telegramStatus) {
+            const indicator = document.getElementById('cockpit-telegram-indicator');
+            const badge = document.getElementById('cockpit-telegram-badge');
+            const status = document.getElementById('cockpit-telegram-status');
+            const autoExecuteCheckbox = document.getElementById('cockpit-auto-execute');
+            const autoExecuteStatus = document.getElementById('cockpit-auto-execute-status');
+            const configStatus = document.getElementById('cockpit-telegram-config');
+
+            if (telegramStatus.running) {
+                indicator.className = 'cockpit-status-indicator online';
+                badge.className = 'status-badge online';
+                badge.textContent = 'Online';
+                status.textContent = 'Running ✅';
+            } else {
+                indicator.className = 'cockpit-status-indicator offline';
+                badge.className = 'status-badge offline';
+                badge.textContent = 'Offline';
+                status.textContent = 'Stopped';
+            }
+
+            if (telegramStatus.auto_execute !== undefined) {
+                autoExecuteCheckbox.checked = telegramStatus.auto_execute;
+                autoExecuteStatus.textContent = telegramStatus.auto_execute ? 'Enabled ✅' : 'Disabled ❌';
+            }
+
+            configStatus.textContent = (telegramStatus.token_configured && telegramStatus.chat_id_configured) ? '✅' : '❌';
+        }
+
+        function updateForwarderStatus(forwarderStatus) {
+            const indicator = document.getElementById('cockpit-forwarder-indicator');
+            const badge = document.getElementById('cockpit-forwarder-badge');
+            const status = document.getElementById('cockpit-forwarder-status');
+            const configStatus = document.getElementById('cockpit-forwarder-config');
+            const channelsCount = document.getElementById('cockpit-forwarder-channels');
+
+            if (forwarderStatus.running) {
+                indicator.className = 'cockpit-status-indicator online';
+                badge.className = 'status-badge online';
+                badge.textContent = 'Online';
+                status.textContent = 'Running ✅';
+            } else {
+                indicator.className = 'cockpit-status-indicator offline';
+                badge.className = 'status-badge offline';
+                badge.textContent = 'Offline';
+                status.textContent = 'Stopped';
+            }
+
+            configStatus.textContent = forwarderStatus.api_configured ? '✅' : '❌';
+            channelsCount.textContent = forwarderStatus.channels_count || 0;
+        }
+
+        async function cockpitStartOutput() {
+            try {
+                const response = await fetch('/api/console/start-output', { method: 'POST' });
+                const data = await response.json();
+                showNotification(data.success ? '✅ Output started!' : '❌ ' + data.error, data.success ? 'success' : 'error');
+                refreshCockpitStatus();
+            } catch (error) {
+                showNotification('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        async function cockpitStopOutput() {
+            try {
+                await fetch('/api/console/stop-output', { method: 'POST' });
+                showNotification('🛑 Output stopped', 'info');
+                refreshCockpitStatus();
+            } catch (error) {
+                showNotification('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        async function cockpitConnectTelethon() {
+            try {
+                const response = await fetch('/api/console/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: 'telethon.connect' })
+                });
+                const data = await response.json();
+                showNotification(data.success ? '✅ ' + data.message : '❌ ' + data.error, data.success ? 'success' : 'error');
+                refreshCockpitStatus();
+            } catch (error) {
+                showNotification('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        async function cockpitDisconnectTelethon() {
+            try {
+                const response = await fetch('/api/console/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: 'telethon.disconnect' })
+                });
+                const data = await response.json();
+                showNotification('✅ ' + data.message, 'info');
+                refreshCockpitStatus();
+            } catch (error) {
+                showNotification('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        async function cockpitStartTelegram() {
+            try {
+                const autoExecute = document.getElementById('cockpit-auto-execute').checked;
+                const response = await fetch('/api/telegram/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ auto_execute: autoExecute })
+                });
+                const data = await response.json();
+                showNotification(data.success ? '✅ Telegram Bot started!' : '❌ ' + data.error, data.success ? 'success' : 'error');
+                refreshCockpitStatus();
+            } catch (error) {
+                showNotification('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        async function cockpitStopTelegram() {
+            try {
+                await fetch('/api/telegram/stop', { method: 'POST' });
+                showNotification('🛑 Telegram Bot stopped', 'info');
+                refreshCockpitStatus();
+            } catch (error) {
+                showNotification('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        function cockpitToggleAutoTrading() {
+            const autoExecute = document.getElementById('cockpit-auto-execute').checked;
+            document.getElementById('cockpit-auto-execute-status').textContent = 
+                autoExecute ? 'Enabled ✅' : 'Disabled ❌';
+        }
+
+        async function cockpitStartForwarder() {
+            try {
+                const response = await fetch('/api/forwarder/start', { method: 'POST' });
+                const data = await response.json();
+                showNotification(data.success ? '✅ Forwarder started!' : '❌ ' + data.error, data.success ? 'success' : 'error');
+                refreshCockpitStatus();
+            } catch (error) {
+                showNotification('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        async function cockpitStopForwarder() {
+            try {
+                await fetch('/api/forwarder/stop', { method: 'POST' });
+                showNotification('🛑 Forwarder stopped', 'info');
+                refreshCockpitStatus();
+            } catch (error) {
+                showNotification('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        // CONFIG FUNCTIONS
+        async function loadConfig() {
+            try {
+                const result = await apiRequest('config');
+                if (result) {
+                    document.getElementById('api-key').value = result.bybit_api_key || '';
+                    document.getElementById('api-secret').value = result.bybit_api_secret || '';
+                    document.getElementById('bybit-platform').value = result.bybit_platform || 'testnet';
+                    document.getElementById('telegram-token').value = result.telegram_bot_token || '';
+                    document.getElementById('telegram-chat-id').value = result.telegram_chat_id || '';
+                    
+                    // Forwarder config
+                    document.getElementById('forwarder-api-id').value = result.forwarder_api_id || '';
+                    document.getElementById('forwarder-api-hash').value = result.forwarder_api_hash || '';
+                    document.getElementById('forwarder-phone').value = result.forwarder_phone_number || '';
+                    document.getElementById('forwarder-target-chat').value = result.forwarder_target_chat_id || '';
+                }
+            } catch (error) {
+                console.error('Error loading config:', error);
+            }
+        }
+
+        async function saveConfig() {
+            const configData = {
+                bybit_api_key: document.getElementById('api-key').value.trim(),
+                bybit_api_secret: document.getElementById('api-secret').value.trim(),
+                bybit_platform: document.getElementById('bybit-platform').value
+            };
+
+            try {
+                await apiRequest('config', 'POST', configData);
+                showNotification('✅ Konfiguracja zapisana!', 'success');
+            } catch (error) {
+                console.error('Error saving config:', error);
+            }
+        }
+
+        async function saveTelegramConfig() {
+            const configData = {
+                telegram_bot_token: document.getElementById('telegram-token').value.trim(),
+                telegram_chat_id: document.getElementById('telegram-chat-id').value.trim()
+            };
+
+            try {
+                await apiRequest('config', 'POST', configData);
+                showNotification('✅ Telegram config zapisana!', 'success');
+            } catch (error) {
+                console.error('Error saving telegram config:', error);
+            }
+        }
+
+        async function testConnection() {
+            try {
+                const result = await apiRequest('test-connection', 'POST');
+                showNotification(result.message, result.success ? 'success' : 'error');
+            } catch (error) {
+                console.error('Error testing connection:', error);
+            }
+        }
+
+        async function getChatId() {
+            try {
+                const result = await apiRequest('telegram/chat-id');
+                if (result.chat_id) {
+                    document.getElementById('telegram-chat-id').value = result.chat_id;
+                    showNotification(`✅ Chat ID pobrane: ${result.chat_id}`, 'success');
+                } else {
+                    showNotification('❌ Nie znaleziono Chat ID', 'error');
+                }
+            } catch (error) {
+                console.error('Error getting chat ID:', error);
+            }
+        }
+
+        // TRADING FUNCTIONS
+        function updateAmountType() {
+            const isPercentage = document.getElementById('amount-percentage').checked;
+            document.getElementById('amount-label').textContent = isPercentage ? '%' : 'USDT';
+        }
+
+        async function saveTradingSettings() {
+            const settings = {
+                leverage: parseInt(document.getElementById('leverage').value),
+                default_amount: parseFloat(document.getElementById('amount').value),
+                use_percentage: document.getElementById('amount-percentage').checked,
+                auto_tp_sl: document.getElementById('auto-tp-sl').checked,
+                auto_breakeven: document.getElementById('auto-breakeven').checked,
+                breakeven_after_target: parseInt(document.getElementById('breakeven-target').value),
+                use_demo_account: document.getElementById('mode-demo').checked
+            };
+
+            try {
+                await apiRequest('trading-settings', 'POST', settings);
+                showNotification('✅ Ustawienia handlowe zapisane!', 'success');
+            } catch (error) {
+                console.error('Error saving trading settings:', error);
+            }
+        }
+
+        // RISK MANAGEMENT FUNCTIONS
+        async function loadRiskStats() {
+            try {
+                const result = await apiRequest('risk-stats');
+                if (result.stats) {
+                    document.getElementById('daily-loss-value').textContent = `${result.stats.daily_loss.toFixed(2)}`;
+                    document.getElementById('weekly-loss-value').textContent = `${result.stats.weekly_loss.toFixed(2)}`;
+                    
+                    if (result.stats.margin_level) {
+                        document.getElementById('margin-value').textContent = result.stats.margin_level.toFixed(2);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading risk stats:', error);
+            }
+        }
+
+        async function saveRiskSettings() {
+            const settings = {
+                risk_management_enabled: document.getElementById('risk-management-enabled').checked,
+                daily_loss_limit: parse<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Trading Bot Pro - Enhanced Edition</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #4F46E5;
+            --primary-hover: #4338CA;
+            --primary-light: #EEF2FF;
+            --secondary-color: #06B6D4;
+            --success-color: #10B981;
+            --success-hover: #059669;
+            --danger-color: #EF4444;
+            --danger-hover: #DC2626;
+            --warning-color: #F59E0B;
+            --warning-hover: #D97706;
+            --info-color: #3B82F6;
+            --info-hover: #2563EB;
+            --dark-bg: #0F172A;
+            --card-bg: #F9FAFB;
+            --text-primary: #1F2937;
+            --text-secondary: #6B7280;
+            --border-color: #E5E7EB;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%239C92AC" fill-opacity="0.05"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E') repeat;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            color: white;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 16px;
+            box-shadow: var(--shadow-xl);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+            position: relative;
+            z-index: 1;
+        }
+
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 25px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 16px 20px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-bottom: 3px solid transparent;
+            min-width: 130px;
+            color: var(--text-secondary);
+            position: relative;
+        }
+
+        .tab-button:hover {
+            background: var(--primary-light);
+            color: var(--primary-color);
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            color: white;
+            border-bottom-color: var(--success-color);
+            box-shadow: inset 0 -3px 0 rgba(0,0,0,0.1);
+        }
+
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--success-color);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(0); }
+        }
+
+        .tab-content {
+            display: none;
+            background: var(--card-bg);
+            padding: 35px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            animation: fadeIn 0.4s ease-in-out;
+            border: 1px solid var(--border-color);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(10px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+
+        .section {
+            background: linear-gradient(135deg, #f6f8fb, #ffffff);
+            padding: 24px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            position: relative;
+            padding-left: 20px;
+        }
+
+        .section-title::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            border-radius: 2px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.3s;
+            background: white;
+            color: var(--text-primary);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .form-control.error {
+            border-color: var(--danger-color);
+            background-color: #FEF2F2;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-right: 10px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-color), var(--success-hover));
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger-color), var(--danger-hover));
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, var(--warning-color), var(--warning-hover));
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, var(--info-color), var(--info-hover));
+            color: white;
+        }
+
+        .btn-info:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 20px;
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .status-online {
+            background: linear-gradient(135deg, var(--success-color), var(--success-hover));
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        .status-offline {
+            background: linear-gradient(135deg, var(--danger-color), var(--danger-hover));
+            color: white;
+        }
+
+        @keyframes pulse {
+            0%, 100% { 
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+            }
+            50% { 
+                box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+            }
+        }
+
+        .alert {
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            display: flex;
+            align-items: flex-start;
+            position: relative;
+            border: 1px solid;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, #ECFDF5, #D1FAE5);
+            border-color: var(--success-color);
+            color: #065F46;
+        }
+
+        .alert-warning {
+            background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
+            border-color: var(--warning-color);
+            color: #92400E;
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
+            border-color: var(--info-color);
+            color: #1E40AF;
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, #FEF2F2, #FEE2E2);
+            border-color: var(--danger-color);
+            color: #991B1B;
+        }
+
+        .console {
+            background: linear-gradient(135deg, #1a1f2e, #0f172a);
+            color: #E0E6ED;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .console::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .console::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .console::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 5px;
+        }
+
+        .console-error { color: #FF6B6B; }
+        .console-warning { color: #FFD43B; }
+        .console-info { color: #74C0FC; }
+        .console-success { color: #51CF66; }
+        .console-debug { color: #ACB5BD; }
+        .console-telethon { color: #FAB005; }
+
+        .console-input {
+            display: flex;
+            gap: 10px;
+        }
+
+        .console-input input {
+            flex: 1;
+            background: linear-gradient(135deg, #2a2f3e, #1f2937);
+            color: #E0E6ED;
+            border: 2px solid rgba(79, 70, 229, 0.3);
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            border-radius: 8px;
+        }
+
+        .console-input input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 10px;
+            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .table th,
+        .table td {
+            padding: 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table th {
+            background: linear-gradient(135deg, var(--primary-light), white);
+            font-weight: 600;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+
+        .table tbody tr {
+            transition: all 0.2s;
+        }
+
+        .table tbody tr:hover {
+            background: var(--primary-light);
+            transform: scale(1.01);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: var(--primary-light);
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .checkbox-wrapper:hover {
+            background: linear-gradient(135deg, var(--primary-light), white);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--primary-color);
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .radio-wrapper {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .radio-wrapper:hover {
+            border-color: var(--primary-color);
+            background: var(--primary-light);
+        }
+
+        .radio-wrapper input[type="radio"] {
+            margin-right: 8px;
+            cursor: pointer;
+            accent-color: var(--primary-color);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 10% auto;
+            padding: 0;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: var(--shadow-xl);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .modal-header h2 {
+            color: var(--primary-color);
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .modal-close {
+            font-size: 32px;
+            font-weight: 300;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.3s;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .modal-close:hover {
+            color: white;
+            background: var(--danger-color);
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .loader {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .loading-content h3 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        .scrollable-frame {
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .scrollable-frame::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .scrollable-frame::-webkit-scrollbar-track {
+            background: var(--primary-light);
+            border-radius: 5px;
+        }
+
+        .scrollable-frame::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 5px;
+        }
+
+        .scrollable-frame::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-hover);
+        }
+
+        /* COCKPIT STYLES */
+        .cockpit-panel {
+            background: linear-gradient(135deg, rgba(30,30,40,0.95), rgba(20,20,30,0.95));
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 0;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .cockpit-panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 48px rgba(0,0,0,0.4);
+        }
+
+        .cockpit-panel-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+        }
+
+        .cockpit-panel-header h3 {
+            margin: 0;
+            font-size: 1.3em;
+            color: white;
+            flex-grow: 1;
+        }
+
+        .cockpit-status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .cockpit-status-indicator.online {
+            background: #4caf50;
+            box-shadow: 0 0 20px #4caf50;
+        }
+
+        .cockpit-status-indicator.offline {
+            background: #f44336;
+            box-shadow: 0 0 20px #f44336;
+        }
+
+        .cockpit-panel-body {
+            padding: 25px;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: #ccc;
+            font-size: 0.95em;
+        }
+
+        .status-row:last-of-type {
+            border-bottom: none;
+        }
+
+        .status-row strong {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .cockpit-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .cockpit-buttons button {
+            padding: 12px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4caf50;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        @media (max-width: 768px) {
+            .grid-2,
+            .grid-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .tab-button {
+                font-size: 13px;
+                padding: 12px 8px;
+                min-width: 100px;
+            }
+
+            .container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .cockpit-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .radio-group {
+                flex-direction: column;
+            }
+        }
+
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, var(--primary-light), white);
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+
+        .step::after {
+            content: '';
+            position: absolute;
+            top: 20px;
+            right: -50%;
+            width: 100%;
+            height: 3px;
+            background: var(--border-color);
+        }
+
+        .step:last-child::after {
+            display: none;
+        }
+
+        .step.completed::after {
+            background: linear-gradient(90deg, var(--success-color), var(--success-hover));
+        }
+
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--border-color);
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+            transition: all 0.3s;
+        }
+
+        .step.completed .step-circle {
+            background: linear-gradient(135deg, var(--success-color), var(--success-hover));
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+        }
+
+        .step.active .step-circle {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
+            animation: pulse 2s infinite;
+        }
+
+        .step-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .step.completed .step-label,
+        .step.active .step-label {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .channel-card {
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s;
+        }
+
+        .channel-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+            background: var(--primary-light);
+        }
+
+        .channel-info {
+            flex: 1;
+        }
+
+        .channel-name {
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+        }
+
+        .channel-meta {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .validation-error {
+            color: var(--danger-color);
+            font-size: 13px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .validation-error.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Trading Bot Pro - Enhanced Edition</h1>
+            <p>Advanced Telegram Bot + Forwarder + Console + Risk Management</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab-button active" onclick="switchTab('cockpit')">🎮 KOKPIT</div>
+            <div class="tab-button" onclick="switchTab('config')">⚙️ Konfiguracja</div>
+            <div class="tab-button" onclick="switchTab('profiles')">💤 Profile</div>
+            <div class="tab-button" onclick="switchTab('trading')">💼 Handel</div>
+            <div class="tab-button" onclick="switchTab('risk')">🛡️ Risk Management</div>
+            <div class="tab-button" onclick="switchTab('signals')">📊 Sygnały</div>
+            <div class="tab-button" onclick="switchTab('telegram')">🤖 Telegram Bot</div>
+            <div class="tab-button" onclick="switchTab('forwarder')">📡 Forwarder</div>
+            <div class="tab-button" onclick="switchTab('console')">💻 Console</div>
+            <div class="tab-button" onclick="switchTab('positions')">🎯 Pozycje</div>
+            <div class="tab-button" onclick="switchTab('logs')">📝 Logi</div>
+        </div>
+
+        <!-- COCKPIT TAB -->
+        <div id="cockpit" class="tab-content active">
+            <h2 style="margin-bottom: 30px; color: var(--text-primary); text-align: center;">
+                🎮 CENTRUM KONTROLI
+            </h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
+                
+                <div class="cockpit-panel">
+                    <div class="cockpit-panel-header">
+                        <span class="cockpit-status-indicator offline" id="cockpit-console-indicator"></span>
+                        <h3>💻 CONSOLE</h3>
+                        <span class="status-badge offline" id="cockpit-console-badge">Offline</span>
+                    </div>
+                    <div class="cockpit-panel-body">
+                        <div class="status-row">
+                            <span>Output:</span>
+                            <strong id="cockpit-output-status">Stopped</strong>
+                        </div>
+                        <div class="status-row">
+                            <span>Telethon:</span>
+                            <strong id="cockpit-telethon-status">Disconnected</strong>
+                        </div>
+                        <div class="cockpit-buttons">
+                            <button class="btn-primary" onclick="cockpitStartOutput()">▶️ Start Output</button>
+                            <button class="btn-danger" onclick="cockpitStopOutput()">⏹️ Stop Output</button>
+                            <button class="btn-success" onclick="cockpitConnectTelethon()">🔗 Connect Telethon</button>
+                            <button class="btn-warning" onclick="cockpitDisconnectTelethon()">🔌 Disconnect</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="cockpit-panel">
+                    <div class="cockpit-panel-header">
+                        <span class="cockpit-status-indicator offline" id="cockpit-telegram-indicator"></span>
+                        <h3>🤖 TELEGRAM BOT</h3>
+                        <span class="status-badge offline" id="cockpit-telegram-badge">Offline</span>
+                    </div>
+                    <div class="cockpit-panel-body">
+                        <div class="status-row">
+                            <span>Status:</span>
+                            <strong id="cockpit-telegram-status">Stopped</strong>
+                        </div>
+                        <div class="status-row">
+                            <span>Auto-Execute:</span>
+                            <strong id="cockpit-auto-execute-status">Disabled ❌</strong>
+                        </div>
+                        <div class="status-row">
+                            <span>Config:</span>
+                            <strong id="cockpit-telegram-config">❌</strong>
+                        </div>
+                        <div style="margin: 15px 0;">
+                            <label class="switch">
+                                <input type="checkbox" id="cockpit-auto-execute" onchange="cockpitToggleAutoTrading()">
+                                <span class="slider"></span>
+                            </label>
+                            <span style="margin-left: 10px; color: #fff;">🚀 Auto-Trading</span>
+                        </div>
+                        <div class="cockpit-buttons">
+                            <button class="btn-primary" onclick="cockpitStartTelegram()">▶️ Start Bot</button>
+                            <button class="btn-danger" onclick="cockpitStopTelegram()">⏹️ Stop Bot</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="cockpit-panel">
+                    <div class="cockpit-panel-header">
+                        <span class="cockpit-status-indicator offline" id="cockpit-forwarder-indicator"></span>
+                        <h3>📡 FORWARDER</h3>
+                        <span class="status-badge offline" id="cockpit-forwarder-badge">Offline</span>
+                    </div>
+                    <div class="cockpit-panel-body">
+                        <div class="status-row">
+                            <span>Status:</span>
+                            <strong id="cockpit-forwarder-status">Stopped</strong>
+                        </div>
+                        <div class="status-row">
+                            <span>API Config:</span>
+                            <strong id="cockpit-forwarder-config">❌</strong>
+                        </div>
+                        <div class="status-row">
+                            <span>Channels:</span>
+                            <strong id="cockpit-forwarder-channels">0</strong>
+                        </div>
+                        <div class="cockpit-buttons">
+                            <button class="btn-primary" onclick="cockpitStartForwarder()">▶️ Start Forwarder</button>
+                            <button class="btn-danger" onclick="cockpitStopForwarder()">⏹️ Stop Forwarder</button>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <div style="margin-top: 30px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px; text-align: center;">
+                <p style="margin: 0; color: #888;">
+                    ⏱️ Auto-refresh: Every 3 seconds | 💾 State saved automatically
+                </p>
+            </div>
+        </div>
+
+        <!-- CONFIG TAB -->
+        <div id="config" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">⚙️ KONFIGURACJA BYBIT API</h2>
+                <div class="form-group">
+                    <label for="api-key">🔑 API Key:</label>
+                    <input type="text" id="api-key" class="form-control" placeholder="Wprowadź API Key">
+                </div>
+                <div class="form-group">
+                    <label for="api-secret">🔐 API Secret:</label>
+                    <input type="password" id="api-secret" class="form-control" placeholder="Wprowadź API Secret">
+                </div>
+                <div class="form-group">
+                    <label for="bybit-platform">🌐 Platforma:</label>
+                    <select id="bybit-platform" class="form-control">
+                        <option value="testnet">🎮 Testnet (Demo)</option>
+                        <option value="mainnet">💰 Mainnet (Live)</option>
+                    </select>
+                </div>
+                <button class="btn btn-success" onclick="saveConfig()">💾 Zapisz Konfigurację</button>
+                <button class="btn btn-info" onclick="testConnection()">🔌 Test Połączenia</button>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">🤖 TELEGRAM BOT CONFIG</h2>
+                <div class="form-group">
+                    <label for="telegram-token">🔑 Bot Token:</label>
+                    <input type="text" id="telegram-token" class="form-control" placeholder="Token z @BotFather">
+                </div>
+                <div class="form-group">
+                    <label for="telegram-chat-id">💬 Chat ID:</label>
+                    <input type="text" id="telegram-chat-id" class="form-control" placeholder="Twój Chat ID">
+                </div>
+                <button class="btn btn-success" onclick="saveTelegramConfig()">💾 Zapisz</button>
+                <button class="btn btn-info" onclick="getChatId()">🔍 Pobierz Chat ID</button>
+            </div>
+        </div>
+
+        <!-- PROFILES TAB -->
+        <div id="profiles" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">💤 ZARZĄDZANIE PROFILAMI</h2>
+                <div class="section">
+                    <h3 class="section-title">💾 Zapisz Obecną Konfigurację</h3>
+                    <div style="display: flex; gap: 10px; align-items: flex-end;">
+                        <div class="form-group" style="flex: 1; margin: 0;">
+                            <label for="profile-name">Nazwa Profilu:</label>
+                            <input type="text" id="profile-name" class="form-control" placeholder="np. Demo Trading">
+                        </div>
+                        <button class="btn btn-success" onclick="saveProfile()">💾 Zapisz Profil</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">📋 Zapisane Profile</h3>
+                    <div class="scrollable-frame">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Nazwa</th>
+                                    <th>Data</th>
+                                    <th>Platforma</th>
+                                    <th>Tryb</th>
+                                    <th>Risk Mgmt</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody id="profiles-list">
+                                <tr><td colspan="6" style="text-align: center;">Brak zapisanych profili</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn btn-primary" onclick="refreshProfiles()">🔄 Odśwież Listę</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TRADING TAB -->
+        <div id="trading" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">💼 USTAWIENIA HANDLOWE</h2>
+                
+                <div class="section">
+                    <h3 class="section-title">⚙️ Parametry Pozycji</h3>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label for="leverage">⚡️ Dźwignia (Leverage):</label>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="number" id="leverage" class="form-control" value="10" min="1" max="100" style="width: 100px;">
+                                <span style="font-weight: 600;">x</span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="amount">💰 Wielkość Pozycji:</label>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="number" id="amount" class="form-control" value="100" min="1" step="1" style="width: 150px;">
+                                <span id="amount-label" style="font-weight: 600;">USDT</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📊 Typ Wielkości:</label>
+                        <div class="radio-group">
+                            <div class="radio-wrapper">
+                                <input type="radio" name="amount-type" id="amount-fixed" value="fixed" checked onchange="updateAmountType()">
+                                <label for="amount-fixed" style="margin: 0; cursor: pointer;">💵 Stała kwota (USDT)</label>
+                            </div>
+                            <div class="radio-wrapper">
+                                <input type="radio" name="amount-type" id="amount-percentage" value="percentage" onchange="updateAmountType()">
+                                <label for="amount-percentage" style="margin: 0; cursor: pointer;">📊 Procent portfela (%)</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">🎯 Auto TP/SL</h3>
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="auto-tp-sl" checked>
+                        <label for="auto-tp-sl" style="margin: 0;">✅ Automatyczne ustawianie TP/SL z sygnału</label>
+                    </div>
+
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="auto-breakeven">
+                        <label for="auto-breakeven" style="margin: 0;">💡 Auto Breakeven po:</label>
+                        <select id="breakeven-target" class="form-control" style="width: auto; margin-left: 10px;">
+                            <option value="1">TP1</option>
+                            <option value="2">TP2</option>
+                            <option value="3" selected>TP3</option>
+                            <option value="4">TP4</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">🎮 Tryb Handlu</h3>
+                    <div class="radio-group">
+                        <div class="radio-wrapper">
+                            <input type="radio" name="trading-mode" id="mode-demo" value="demo" checked>
+                            <label for="mode-demo" style="margin: 0; cursor: pointer;">🎮 Demo Trading</label>
+                        </div>
+                        <div class="radio-wrapper">
+                            <input type="radio" name="trading-mode" id="mode-live" value="live">
+                            <label for="mode-live" style="margin: 0; cursor: pointer;">💰 Live Trading</label>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning" style="margin-top: 15px;">
+                        <strong>⚠️ UWAGA:</strong> W trybie LIVE bot będzie wykonywał prawdziwe transakcje!
+                    </div>
+                </div>
+
+                <button class="btn btn-success" onclick="saveTradingSettings()">💾 Zapisz Ustawienia</button>
+            </div>
+        </div>
+
+        <!-- RISK MANAGEMENT TAB -->
+        <div id="risk" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">🛡️ RISK MANAGEMENT</h2>
+                
+                <div class="alert alert-info">
+                    <strong>📊 System Risk Management chroni Twój kapitał przed:</strong><br>
+                    • Nadmiernymi stratami dziennymi i tygodniowymi<br>
+                    • Serią strat z rzędu (cooling period)<br>
+                    • Niskim poziomem margin (ochrona przed likwidacją)
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">📈 Aktualne Statystyki</h3>
+                    <div class="grid-3">
+                        <div style="background: rgba(239, 68, 68, 0.2); padding: 20px; border-radius: 10px; border: 2px solid #ef4444;">
+                            <div style="font-size: 0.9em; color: #ef4444; margin-bottom: 10px;">📉 Strata Dzienna</div>
+                            <div style="font-size: 2em; font-weight: 700; color: var(--text-primary);" id="daily-loss-value">$0.00</div>
+                            <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">Limit: <span id="daily-limit-display">$500</span></div>
+                        </div>
+
+                        <div style="background: rgba(245, 158, 11, 0.2); padding: 20px; border-radius: 10px; border: 2px solid #f59e0b;">
+                            <div style="font-size: 0.9em; color: #f59e0b; margin-bottom: 10px;">📅 Strata Tygodniowa</div>
+                            <div style="font-size: 2em; font-weight: 700; color: var(--text-primary);" id="weekly-loss-value">$0.00</div>
+                            <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">Limit: <span id="weekly-limit-display">$2000</span></div>
+                        </div>
+
+                        <div style="background: rgba(34, 197, 94, 0.2); padding: 20px; border-radius: 10px; border: 2px solid #22c55e;">
+                            <div style="font-size: 0.9em; color: #22c55e; margin-bottom: 10px;">💪 Margin Level</div>
+                            <div style="font-size: 2em; font-weight: 700; color: var(--text-primary);" id="margin-value">--</div>
+                            <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">Min: <span id="margin-limit-display">1.5</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">⚙️ Ustawienia Limitów</h3>
+                    
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="risk-management-enabled" checked>
+                        <label for="risk-management-enabled" style="margin: 0; font-weight: 600;">🛡️ Włącz Risk Management (ZALECANE)</label>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label for="daily-loss-limit">💔 Dzienny Limit Strat ($):</label>
+                            <input type="number" id="daily-loss-limit" class="form-control" value="500" min="0" step="50">
+                            <small style="color: var(--text-secondary);">Bot przestanie handlować po osiągnięciu tego limitu</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="weekly-loss-limit">📅 Tygodniowy Limit Strat ($):</label>
+                            <input type="number" id="weekly-loss-limit" class="form-control" value="2000" min="0" step="100">
+                            <small style="color: var(--text-secondary);">Maksymalna strata w tygodniu</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="max-consecutive-losses">🔴 Max Straty z Rzędu:</label>
+                            <input type="number" id="max-consecutive-losses" class="form-control" value="3" min="1" max="10">
+                            <small style="color: var(--text-secondary);">Cooling period po X stratach z rzędu</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="min-margin-level">⚠️ Min Margin Level:</label>
+                            <input type="number" id="min-margin-level" class="form-control" value="1.5" min="1.1" max="5" step="0.1">
+                            <small style="color: var(--text-secondary);">Chroni przed likwidacją (zalecane: 1.5-2.0)</small>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <strong>🔒 Zabezpieczenia:</strong><br>
+                        • Bot automatycznie przestanie otwierać pozycje przy niskim margin level<br>
+                        • Po 3 stratach z rzędu - 1 godzina cooling period<br>
+                        • Limity resetują się automatycznie o północy (dzienne) i w poniedziałek (tygodniowe)
+                    </div>
+
+                    <button class="btn btn-success" onclick="saveRiskSettings()">💾 Zapisz Ustawienia</button>
+                    <button class="btn btn-warning" onclick="resetRiskLimits()">🔄 Reset Limitów</button>
+                    <button class="btn btn-info" onclick="checkMarginLevel()">📊 Sprawdź Margin</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SIGNALS TAB -->
+        <div id="signals" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">📊 TEST SYGNAŁÓW</h2>
+                
+                <div class="alert alert-info">
+                    <strong>💡 Jak używać:</strong><br>
+                    1. Wklej sygnał tradingowy w polu poniżej<br>
+                    2. System automatycznie rozpozna parametry<br>
+                    3. Sprawdź czy wszystko się zgadza<br>
+                    4. Kliknij "Wykonaj" aby otworzyć pozycję
+                </div>
+
+                <div class="form-group">
+                    <label for="signal-input">📝 Wklej Sygnał:</label>
+                    <textarea id="signal-input" class="form-control" rows="10" placeholder="Przykład:
+🔥 #BTCUSDT LONG 🔥
+
+Entry: 45000
+Stop Loss: 44500
+
+Targets:
+TP1: 45500
+TP2: 46000
+TP3: 46500"></textarea>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-primary" onclick="parseSignal()">🔍 Analizuj Sygnał</button>
+                    <button class="btn btn-success" onclick="executeSignal()" id="execute-signal-btn" disabled>✅ Wykonaj Trade</button>
+                    <button class="btn btn-warning" onclick="clearSignal()">🗑️ Wyczyść</button>
+                </div>
+
+                <div id="signal-result" class="console" style="min-height: 200px;">
+                    <div class="console-info">[INFO] Wklej sygnał i kliknij "Analizuj Sygnał"</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TELEGRAM BOT TAB -->
+        <div id="telegram" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">🤖 TELEGRAM BOT</h2>
+                
+                <div class="alert alert-success">
+                    <strong>✨ Funkcje Telegram Bot:</strong><br>
+                    • Automatyczne odbieranie sygnałów z Telegram<br>
+                    • Parsowanie i analiza sygnałów<br>
+                    • Wykonywanie tradów (jeśli włączone Auto-Execute)<br>
+                    • Powiadomienia o wykonanych transakcjach
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">📊 Status Bota</h3>
+                    <div class="grid-2">
+                        <div class="section">
+                            <h4 style="color: var(--primary-color); margin-bottom: 15px;">📊 Status</h4>
+                            <div id="telegram-status" class="status-badge status-offline">
+                                🔴 Bot Nieaktywny
+                            </div>
+                        </div>
+                        
+                        <div class="section">
+                            <h4 style="color: var(--primary-color); margin-bottom: 15px;">🎮 Auto-Execute</h4>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <label class="switch">
+                                    <input type="checkbox" id="auto-execute">
+                                    <span class="slider"></span>
+                                </label>
+                                <span>🚀 Automatyczne wykonywanie tradów</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">🎮 Kontrola</h3>
+                    <button class="btn btn-success" onclick="startTelegram()">▶️ Start Bota</button>
+                    <button class="btn btn-danger" onclick="stopTelegram()">⏹️ Stop Bota</button>
+                </div>
+
+                <div class="alert alert-warning">
+                    <strong>💡 TIPS:</strong><br>
+                    • Bot rozpoznaje sygnały w standardowym formacie<br>
+                    • Wszystkie akcje są logowane w zakładce "Logi"<br>
+                    • Możesz testować sygnały ręcznie w zakładce "Sygnały"
+                </div>
+            </div>
+        </div>
+
+        <!-- FORWARDER TAB -->
+        <div id="forwarder" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">📡 TELEGRAM FORWARDER</h2>
+                
+                <div class="step-indicator">
+                    <div class="step" id="step-1">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">API Setup</div>
+                    </div>
+                    <div class="step" id="step-2">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Autoryzacja</div>
+                    </div>
+                    <div class="step" id="step-3">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Wybór Kanałów</div>
+                    </div>
+                    <div class="step" id="step-4">
+                        <div class="step-circle">4</div>
+                        <div class="step-label">Start</div>
+                    </div>
+                </div>
+
+                <div class="alert alert-success">
+                    <strong>✨ ENHANCED: Persistent Sessions!</strong><br>
+                    • System zapisuje sesję - logowanie 2FA tylko RAZ<br>
+                    • Sesje są przechowywane w folderze telegram_sessions/<br>
+                    • Po pierwszym logowaniu nie będziesz musiał podawać kodu ponownie
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">🔧 Krok 1: Telethon API Configuration</h3>
+                    <div class="form-group">
+                        <label for="forwarder-api-id">🔢 API ID:</label>
+                        <input type="text" id="forwarder-api-id" class="form-control" placeholder="Pobierz z my.telegram.org">
+                        <div class="validation-error" id="api-id-error"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="forwarder-api-hash">🔐 API Hash:</label>
+                        <input type="text" id="forwarder-api-hash" class="form-control" placeholder="Pobierz z my.telegram.org">
+                        <div class="validation-error" id="api-hash-error"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="forwarder-phone">📱 Numer Telefonu:</label>
+                        <input type="text" id="forwarder-phone" class="form-control" placeholder="+48123456789">
+                        <small style="color: var(--text-secondary);">Z kodem kraju (np. +48 dla Polski)</small>
+                        <div class="validation-error" id="phone-error"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="forwarder-target-chat">🎯 Docelowy Chat ID:</label>
+                        <input type="text" id="forwarder-target-chat" class="form-control" placeholder

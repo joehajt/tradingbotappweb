@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Trading Bot Pro - Professional Edition</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Professional Dark Theme */
+            --bg-primary: #0B0E11;
+            --bg-secondary: #161A1E;
+            --bg-tertiary: #1E2329;
+            --bg-hover: #2B3139;
+
+            /* Accent Colors */
+            --accent-blue: #0ECB81;
+            --accent-green: #0ECB81;
+            --accent-red: #F6465D;
+            --accent-yellow: #F0B90B;
+            --accent-purple: #8B5CF6;
+
+            /* Text */
+            --text-primary: #EAECEF;
+            --text-secondary: #848E9C;
+            --text-tertiary: #5E6673;
+
+            /* Borders */
+            --border-color: #2B3139;
+            --border-light: #373E47;
+
+            /* Shadows */
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* Top Navigation Bar */
+        .top-nav {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 20px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent-green);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-items {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .nav-item {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color 0.2s;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        .nav-item:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+
+        .nav-item.active {
+            color: var(--accent-green);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 60px;
+            width: 240px;
+            height: calc(100vh - 60px);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-title {
+            color: var(--text-tertiary);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 0 20px;
+            margin-bottom: 8px;
+        }
+
+        .sidebar-item {
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .sidebar-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .sidebar-item.active {
+            background: rgba(14, 203, 129, 0.1);
+            color: var(--accent-green);
+            border-left: 3px solid var(--accent-green);
+        }
+
+        .sidebar-icon {
+            font-size: 18px;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 240px;
+            margin-top: 60px;
+            padding: 24px;
+            min-height: calc(100vh - 60px);
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-light);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .stat-change {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .stat-change.positive {
+            color: var(--accent-green);
+        }
+
+        .stat-change.negative {
+            color: var(--accent-red);
+        }
+
+        /* Trading Panel */
+        .trading-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Form Controls */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-input {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-green);
+            background: var(--bg-secondary);
+        }
+
+        .form-input:hover {
+            border-color: var(--border-light);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: var(--accent-green);
+            color: var(--bg-primary);
+        }
+
+        .btn-primary:hover {
+            background: #0BB871;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(14, 203, 129, 0.3);
+        }
+
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #E8344E;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(246, 70, 93, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-light);
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table thead {
+            background: var(--bg-tertiary);
+        }
+
+        .table th {
+            padding: 16px;
+            text-align: left;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table td {
+            padding: 16px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table tbody tr:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-success {
+            background: rgba(14, 203, 129, 0.15);
+            color: var(--accent-green);
+        }
+
+        .badge-danger {
+            background: rgba(246, 70, 93, 0.15);
+            color: var(--accent-red);
+        }
+
+        .badge-warning {
+            background: rgba(240, 185, 11, 0.15);
+            color: var(--accent-yellow);
+        }
+
+        .badge-info {
+            background: rgba(139, 92, 246, 0.15);
+            color: var(--accent-purple);
+        }
+
+        /* Chart Placeholder */
+        .chart-container {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-tertiary);
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        /* Toggle Switch */
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--text-tertiary);
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background-color: var(--accent-green);
+            border-color: var(--accent-green);
+        }
+
+        .toggle input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+            background-color: white;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* Status Indicator */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-dot.online {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .status-dot.offline {
+            background: var(--text-tertiary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation -->
+    <div class="top-nav">
+        <div class="logo">
+            <div class="logo-icon">🚀</div>
+            <span>Trading Bot Pro</span>
+        </div>
+        <div class="nav-items">
+            <div class="nav-item">
+                <span class="status-dot online"></span>
+                Connected
+            </div>
+            <div class="nav-item">Balance: <strong>$0.00</strong></div>
+            <div class="nav-item">Demo Mode</div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-section">
+            <div class="sidebar-title">Trading</div>
+            <div class="sidebar-item active" onclick="showView('dashboard')">
+                <span class="sidebar-icon">📊</span>
+                Dashboard
+            </div>
+            <div class="sidebar-item" onclick="showView('trading')">
+                <span class="sidebar-icon">💼</span>
+                Manual Trading
+            </div>
+            <div class="sidebar-item" onclick="showView('positions')">
+                <span class="sidebar-icon">🎯</span>
+                Positions
+            </div>
+            <div class="sidebar-item" onclick="showView('history')">
+                <span class="sidebar-icon">📈</span>
+                Trade History
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-title">Automation</div>
+            <div class="sidebar-item" onclick="showView('signals')">
+                <span class="sidebar-icon">⚡</span>
+                Signal Analyzer
+            </div>
+            <div class="sidebar-item" onclick="showView('telegram')">
+                <span class="sidebar-icon">🤖</span>
+                Telegram Bot
+            </div>
+            <div class="sidebar-item" onclick="showView('forwarder')">
+                <span class="sidebar-icon">📡</span>
+                Channel Forwarder
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-title">Settings</div>
+            <div class="sidebar-item" onclick="showView('config')">
+                <span class="sidebar-icon">⚙️</span>
+                Configuration
+            </div>
+            <div class="sidebar-item" onclick="showView('risk')">
+                <span class="sidebar-icon">🛡️</span>
+                Risk Management
+            </div>
+            <div class="sidebar-item" onclick="showView('logs')">
+                <span class="sidebar-icon">📝</span>
+                System Logs
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="fade-in">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Balance</div>
+                    <div class="stat-value">$0.00</div>
+                    <div class="stat-change positive">+0.00% (24h)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Today's P&L</div>
+                    <div class="stat-value">$0.00</div>
+                    <div class="stat-change positive">+0.00%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Positions</div>
+                    <div class="stat-value">0</div>
+                    <div class="stat-change">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Win Rate</div>
+                    <div class="stat-value">0%</div>
+                    <div class="stat-change">0/0 trades</div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="trading-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        ⚡ Quick Actions
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <button class="btn btn-primary" onclick="showView('trading')">
+                        💼 Open Trade
+                    </button>
+                    <button class="btn btn-secondary" onclick="refreshBalance()">
+                        🔄 Refresh Balance
+                    </button>
+                    <button class="btn btn-secondary" onclick="showView('signals')">
+                        ⚡ Analyze Signal
+                    </button>
+                    <button class="btn btn-secondary" onclick="showView('config')">
+                        ⚙️ Configure Bot
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="table-container">
+                <div class="panel-header" style="padding: 20px; margin: 0;">
+                    <div class="panel-title">
+                        📈 Recent Activity
+                    </div>
+                </div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Symbol</th>
+                            <th>Type</th>
+                            <th>Entry</th>
+                            <th>Status</th>
+                            <th>P&L</th>
+                        </tr>
+                    </thead>
+                    <tbody id="activity-list">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-tertiary); padding: 40px;">
+                                No recent activity
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Other views will be loaded dynamically -->
+        <div id="trading-view" style="display: none;">
+            <div class="trading-panel">
+                <div class="panel-header">
+                    <div class="panel-title">💼 Manual Trading</div>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Symbol</label>
+                        <input type="text" class="form-input" placeholder="BTCUSDT" value="BTCUSDT">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Side</label>
+                        <select class="form-input">
+                            <option>Long</option>
+                            <option>Short</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Leverage</label>
+                        <input type="number" class="form-input" value="10" min="1" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Amount (USDT)</label>
+                        <input type="number" class="form-input" value="100" min="0">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 20px;">
+                    <button class="btn btn-primary">🚀 Execute Trade</button>
+                    <button class="btn btn-secondary">📊 Calculate Position</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Socket.IO connection
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log('✅ Connected to server');
+        });
+
+        // View Management
+        function showView(viewName) {
+            // Hide all views
+            const views = document.querySelectorAll('[id$="-view"]');
+            views.forEach(view => view.style.display = 'none');
+
+            // Show selected view
+            const targetView = document.getElementById(`${viewName}-view`);
+            if (targetView) {
+                targetView.style.display = 'block';
+                targetView.classList.add('fade-in');
+            }
+
+            // Update sidebar
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.sidebar-item')?.classList.add('active');
+        }
+
+        // API Functions
+        async function refreshBalance() {
+            console.log('Refreshing balance...');
+            // API call implementation
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Trading Bot Pro - Professional Edition');
+            console.log('✅ Application ready');
+        });
+    </script>
+</body>
+</html>

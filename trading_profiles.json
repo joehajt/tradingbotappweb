@@ -1,0 +1,56 @@
+{
+  "joe": {
+    "timestamp": "2025-11-20T10:52:16.568916",
+    "config": {
+      "telegram_token": "8175802995:AAHzc1Sz6Sk37apDygHCj0jY2dh-Xn_KAqQ",
+      "telegram_chat_id": "476877476",
+      "bybit_api_key": "FwzWL4ueFLs8VSSSz0",
+      "bybit_api_secret": "ey9fDfHlf0kh9LlFewPsSxQOqIcZITbbjuhY",
+      "bybit_subaccount": "",
+      "bybit_platform": "bybit",
+      "position_mode": "hedge",
+      "default_leverage": 10,
+      "default_amount": 100.0,
+      "use_percentage": false,
+      "use_demo_account": true,
+      "auto_tp_sl": true,
+      "auto_breakeven": true,
+      "breakeven_after_target": 1,
+      "auto_execute_signals": false,
+      "max_position_size": 1000.0,
+      "risk_percent": 2.0,
+      "risk_management_enabled": true,
+      "daily_loss_limit": 500.0,
+      "weekly_loss_limit": 2000.0,
+      "max_consecutive_losses": 3,
+      "min_margin_level": 1.0
+    }
+  },
+  "joee": {
+    "timestamp": "2025-11-20T10:52:54.489966",
+    "config": {
+      "telegram_token": "8175802995:AAHzc1Sz6Sk37apDygHCj0jY2dh-Xn_KAqQ",
+      "telegram_chat_id": "476877476",
+      "bybit_api_key": "FwzWL4ueFLs8VSSSz0",
+      "bybit_api_secret": "ey9fDfHlf0kh9LlFewPsSxQOqIcZITbbjuhY",
+      "bybit_subaccount": "",
+      "bybit_platform": "bybit",
+      "position_mode": "hedge",
+      "default_leverage": 10,
+      "default_amount": 100.0,
+      "use_percentage": false,
+      "use_demo_account": false,
+      "auto_tp_sl": true,
+      "auto_breakeven": true,
+      "breakeven_after_target": 1,
+      "auto_execute_signals": false,
+      "max_position_size": 1000.0,
+      "risk_percent": 2.0,
+      "risk_management_enabled": true,
+      "daily_loss_limit": 500.0,
+      "weekly_loss_limit": 2000.0,
+      "max_consecutive_losses": 3,
+      "min_margin_level": 1.5
+    }
+  }
+}

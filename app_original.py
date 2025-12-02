@@ -17,59 +17,8 @@ from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import queue
 
-# Fix Windows console encoding for emoji support
-if sys.platform == 'win32':
-    # Windows console cannot handle UTF-8 emoji properly
-    # Redirect all output to NUL to avoid OSError
-    class SafeWriter:
-        """Writer that strips problematic characters for Windows console"""
-        def __init__(self, stream):
-            self.stream = stream
-
-        def write(self, text):
-            try:
-                # Try to write as-is first
-                if isinstance(text, str):
-                    # Remove emoji and other non-ASCII characters
-                    text = text.encode('ascii', 'ignore').decode('ascii')
-                self.stream.write(text)
-            except (OSError, UnicodeEncodeError):
-                # If that fails, silently ignore
-                pass
-
-        def flush(self):
-            try:
-                self.stream.flush()
-            except:
-                pass
-
-    try:
-        sys.stdout = SafeWriter(sys.stdout)
-        sys.stderr = SafeWriter(sys.stderr)
-    except Exception:
-        pass
-
-# Load environment variables early (before importing api_routes)
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass  # dotenv not required for basic operation
-
 # Wyłącz ostrzeżenia SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# Helper function for emoji printing (Windows console compatibility)
-def safe_print(*args, **kwargs):
-    """Print with emoji fallback for Windows console"""
-    try:
-        print(*args, **kwargs)
-    except UnicodeEncodeError:
-        # Remove emoji and try again
-        text = ' '.join(str(arg) for arg in args)
-        # Remove common emoji
-        text = text.encode('ascii', 'ignore').decode('ascii')
-        print(text, **kwargs)
 
 # Ścieżki plików
 CONFIG_FILE = "config.ini"
@@ -80,40 +29,66 @@ SESSIONS_DIR = "telegram_sessions"  # NEW: Directory for persistent Telegram ses
 # === QUICK SETUP SCRIPT ===
 def run_quick_setup():
     """Quick setup script - creates project structure"""
-    safe_print("\n🚀 Trading Bot Quick Setup")
-    safe_print("=" * 50)
-
+    print("\n🚀 Trading Bot Quick Setup")
+    print("=" * 50)
+    
     # Create templates directory
     if not os.path.exists('templates'):
         os.makedirs('templates')
-        safe_print("✅ Created templates/ directory")
+        print("✅ Created templates/ directory")
     else:
-        safe_print("ℹ️  templates/ directory already exists")
+        print("ℹ️  templates/ directory already exists")
     
     # Create sessions directory for Telegram
     if not os.path.exists(SESSIONS_DIR):
         os.makedirs(SESSIONS_DIR)
-        safe_print("✅ Created telegram_sessions/ directory for persistent sessions")
+        print("✅ Created telegram_sessions/ directory for persistent sessions")
     else:
-        safe_print("ℹ️  telegram_sessions/ directory already exists")
-
-    # Check if templates exist
-    templates_ok = False
-    if not os.path.exists('templates/index_new.html') and not os.path.exists('templates/index.html'):
-        safe_print("❌ WARNING: No template files found!")
-        safe_print("\n📋 Please ensure templates/index_new.html or templates/index.html exists")
-        templates_ok = False
+        print("ℹ️  telegram_sessions/ directory already exists")
+    
+    # Check if templates/index.html exists
+    if not os.path.exists('templates/index.html'):
+        print("❌ WARNING: templates/index.html not found!")
+        print("\n📋 Please create templates/index.html with the frontend code")
+        print("   You can find it in the 'trading-bot-webapp' artifact\n")
+        return False
     else:
-        if os.path.exists('templates/index_new.html'):
-            safe_print("✅ templates/index_new.html found (with login/register)")
-        if os.path.exists('templates/index.html'):
-            safe_print("✅ templates/index.html found (backup)")
-        templates_ok = True
+        print("✅ templates/index.html found")
+        return True
+    
+    # Create requirements.txt if it doesn't exist
+    if not os.path.exists('requirements.txt'):
+        requirements = """# Core Web Framework
+flask==2.3.2
+flask-socketio==5.3.4
+flask-cors==4.0.0
 
-    safe_print("\n📁 Project structure ready!")
-    safe_print("=" * 50 + "\n")
+# Trading & APIs - Updated versions
+pybit==5.7.0
+python-telegram-bot==20.4
+telethon==1.30.3
 
-    return templates_ok
+# HTTP & Security
+requests==2.31.0
+urllib3==2.0.4
+
+# Async Support
+python-engineio==4.7.1
+python-socketio==5.9.0
+
+# Additional Dependencies
+configparser==5.3.0"""
+        
+        with open('requirements.txt', 'w', encoding='utf-8') as f:
+            f.write(requirements)
+        print("✅ Created requirements.txt")
+    
+    print("\n📁 Project structure ready!")
+    print("\n📋 Next steps:")
+    print("1. Install dependencies: pip install -r requirements.txt")
+    print("2. Make sure templates/index.html exists with actual frontend code")
+    print("3. Run: python app.py")
+    print("=" * 50 + "\n")
 
 # Run setup check
 setup_ok = run_quick_setup()
@@ -122,25 +97,25 @@ setup_ok = run_quick_setup()
 try:
     from telegram import Bot, Update
     from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
-    safe_print("✅ Telegram bot library OK")
+    print("✅ Telegram bot library OK")
 except ImportError as e:
-    safe_print(f"❌ Błąd importu Telegram: {e}")
-    safe_print("💡 Zainstaluj: pip install python-telegram-bot")
+    print(f"❌ Błąd importu Telegram: {e}")
+    print("💡 Zainstaluj: pip install python-telegram-bot")
 
 try:
     from pybit.unified_trading import HTTP
-    safe_print("✅ Pybit library OK")
+    print("✅ Pybit library OK")
 except ImportError as e:
-    safe_print(f"❌ Błąd importu Pybit: {e}")
-    safe_print("💡 Zainstaluj: pip install pybit==5.7.0")
+    print(f"❌ Błąd importu Pybit: {e}")
+    print("💡 Zainstaluj: pip install pybit==5.7.0")
 
 try:
     import requests
     import hmac
     import hashlib
-    safe_print("✅ Biblioteki HTTP OK")
+    print("✅ Biblioteki HTTP OK")
 except ImportError as e:
-    safe_print(f"❌ Błąd importu HTTP: {e}")
+    print(f"❌ Błąd importu HTTP: {e}")
 
 # NOWY IMPORT - Telethon dla forwardowania
 TELETHON_AVAILABLE = False
@@ -149,12 +124,12 @@ try:
     from telethon import TelegramClient as AsyncTelegramClient, events
     from telethon.tl.types import Channel, Chat, User
     from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError, FloodWaitError
-    safe_print("✅ Telethon library OK")
+    print("✅ Telethon library OK")
     TELETHON_AVAILABLE = True
 except ImportError as e:
-    safe_print(f"❌ Błąd importu Telethon: {e}")
-    safe_print("💡 Zainstaluj: pip install telethon")
-    safe_print("⚠️  Forwarder będzie niedostępny bez Telethon!")
+    print(f"❌ Błąd importu Telethon: {e}")
+    print("💡 Zainstaluj: pip install telethon")
+    print("⚠️  Forwarder będzie niedostępny bez Telethon!")
 
 # Konfiguracja logowania
 logging.basicConfig(
@@ -162,7 +137,7 @@ logging.basicConfig(
     level=logging.INFO,
     handlers=[
         logging.FileHandler('bot_trading.log', encoding='utf-8'),
-        logging.StreamHandler()  # Safe now with SafeWriter wrapper
+        logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
@@ -172,13 +147,6 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here-change-in-production'
 app.config['JSON_AS_ASCII'] = False
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-
-# Ensure UTF-8 encoding for all responses
-@app.after_request
-def after_request(response):
-    response.headers['Content-Type'] = response.headers.get('Content-Type', 'text/html') + '; charset=utf-8'
-    return response
 
 # Initialize CORS with explicit configuration
 CORS(app, resources={
@@ -203,20 +171,6 @@ socketio = SocketIO(
 
 # Global message queue for real-time communication
 message_queue = queue.Queue()
-
-# Test endpoint to verify routes work
-@app.route('/api/test', methods=['GET'])
-def test_endpoint():
-    return jsonify({'success': True, 'message': 'Test endpoint works!'})
-
-# Register user panel API routes
-try:
-    from app_user_api import register_user_api
-    register_user_api(app)
-except ImportError as e:
-    print(f"⚠️  Warning: Could not import user API: {e}")
-except Exception as e:
-    print(f"⚠️  Warning: Error registering user API: {e}")
 
 # Global auth queue for Telethon authentication
 auth_queue = queue.Queue()
@@ -500,94 +454,50 @@ class EnhancedRiskManager:
 
 
 class ProfileManager:
-    """Zarządzanie profilami handlowymi - per user (database)"""
-
-    def __init__(self, db=None):
-        from database import Database
-        self.db = db or Database()
-        # Initialize database schema
-        self.db.initialize()
-
-    def get_user_profiles(self, user_id):
-        """Pobierz wszystkie profile użytkownika"""
+    """Zarządzanie profilami handlowymi"""
+    
+    def __init__(self):
+        self.profiles = self.load_profiles()
+    
+    def load_profiles(self):
+        """Wczytaj profile z pliku"""
         try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT profile_name, config_data, created_at, updated_at
-                    FROM trading_profiles
-                    WHERE user_id = ?
-                    ORDER BY updated_at DESC
-                """, (user_id,))
-                rows = cursor.fetchall()
-
-                profiles = {}
-                for row in rows:
-                    profiles[row['profile_name']] = {
-                        'timestamp': row['updated_at'],
-                        'config': json.loads(row['config_data'])
-                    }
-                return profiles
-        except Exception as e:
-            logger.error(f"Error loading profiles for user {user_id}: {e}")
+            if os.path.exists(PROFILES_FILE):
+                with open(PROFILES_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
             return {}
-
-    def save_profile(self, user_id, name, config_data):
-        """Zapisz profil użytkownika"""
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-
-                config_json = json.dumps(config_data, ensure_ascii=False)
-
-                # Insert or update
-                cursor.execute("""
-                    INSERT INTO trading_profiles (user_id, profile_name, config_data, updated_at)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                    ON CONFLICT(user_id, profile_name)
-                    DO UPDATE SET
-                        config_data = excluded.config_data,
-                        updated_at = CURRENT_TIMESTAMP
-                """, (user_id, name, config_json))
-
-                return True
         except Exception as e:
-            logger.error(f"Error saving profile for user {user_id}: {e}")
-            return False
-
-    def load_profile(self, user_id, name):
-        """Wczytaj profil użytkownika"""
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT config_data
-                    FROM trading_profiles
-                    WHERE user_id = ? AND profile_name = ?
-                """, (user_id, name))
-                row = cursor.fetchone()
-
-                if row:
-                    return json.loads(row['config_data'])
-                return {}
-        except Exception as e:
-            logger.error(f"Error loading profile '{name}' for user {user_id}: {e}")
+            logger.error(f"❌ Błąd wczytywania profili: {e}")
             return {}
-
-    def delete_profile(self, user_id, name):
-        """Usuń profil użytkownika"""
+    
+    def save_profiles(self):
+        """Zapisz profile do pliku"""
         try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    DELETE FROM trading_profiles
-                    WHERE user_id = ? AND profile_name = ?
-                """, (user_id, name))
-
-                return cursor.rowcount > 0
+            with open(PROFILES_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.profiles, f, indent=2, ensure_ascii=False)
+            return True
         except Exception as e:
-            logger.error(f"Error deleting profile '{name}' for user {user_id}: {e}")
+            logger.error(f"❌ Błąd zapisu profili: {e}")
             return False
+    
+    def save_profile(self, name, config_data):
+        """Zapisz profil"""
+        self.profiles[name] = {
+            'timestamp': datetime.now().isoformat(),
+            'config': config_data
+        }
+        return self.save_profiles()
+    
+    def load_profile(self, name):
+        """Wczytaj profil"""
+        return self.profiles.get(name, {}).get('config', {})
+    
+    def delete_profile(self, name):
+        """Usuń profil"""
+        if name in self.profiles:
+            del self.profiles[name]
+            return self.save_profiles()
+        return False
 
 
 class TelegramForwarder:
@@ -3843,18 +3753,122 @@ def handle_status_request():
 
 @app.route('/')
 def index():
-    """Render login/register page"""
-    logger.info("Rendering login page...")
-    return render_template('login.html')
-
-
-@app.route('/dashboard')
-def dashboard():
-    """Render trading bot dashboard (requires authentication via session cookie or token)"""
-    logger.info("Rendering dashboard (index.html)...")
-    # Note: Authentication is handled client-side via JWT token in localStorage
-    # and server-side via API endpoints
-    return render_template('index.html')
+    """Render main page"""
+    try:
+        import os
+        
+        # Debug info
+        current_dir = os.getcwd()
+        template_path = os.path.join(current_dir, 'templates', 'index.html')
+        file_exists = os.path.exists(template_path)
+        
+        print("="*60)
+        print("🔍 DEBUG: Route '/' called")
+        print(f"📁 Current directory: {current_dir}")
+        print(f"📄 Template path: {template_path}")
+        print(f"✅ File exists: {file_exists}")
+        
+        if file_exists:
+            # Sprawdź rozmiar pliku
+            file_size = os.path.getsize(template_path)
+            print(f"📊 File size: {file_size} bytes")
+            
+            if file_size > 0:
+                print("🚀 Attempting to render template...")
+                result = render_template('index.html')
+                print("✅ Template rendered successfully!")
+                return result
+            else:
+                print("❌ File is empty!")
+                return """
+                <html>
+                <head><title>Trading Bot - Error</title></head>
+                <body style="font-family: Arial; padding: 50px; text-align: center;">
+                    <h1>🚀 Trading Bot</h1>
+                    <h2>❌ File Error</h2>
+                    <p>templates/index.html exists but is empty (0 bytes)</p>
+                    <p><a href="/test">Test Page</a></p>
+                </body>
+                </html>
+                """
+        else:
+            print("❌ File not found!")
+            
+        print("="*60)
+        
+        # If no file, return setup error
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Trading Bot - Setup Required</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; padding: 50px; background-color: #f5f5f5; }}
+                .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                h1 {{ color: #2E86AB; }}
+                .error {{ background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+                .info {{ background-color: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+                code {{ background-color: #e9ecef; padding: 2px 5px; border-radius: 3px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🚀 Trading Bot - Setup Required</h1>
+                <div class="error">
+                    <strong>⚠️ Missing HTML file!</strong><br>
+                    File <code>templates/index.html</code> not found
+                </div>
+                <div class="info">
+                    <strong>📋 Debug Info:</strong><br>
+                    Current directory: <code>{current_dir}</code><br>
+                    Template path: <code>{template_path}</code><br>
+                    File exists: <code>{file_exists}</code><br><br>
+                    
+                    <strong>Instructions:</strong><br><br>
+                    1. Create folder <code>templates</code> in the same directory as <code>app.py</code><br>
+                    2. Save HTML file with interface as <code>templates/index.html</code><br>
+                    3. Refresh the page<br><br>
+                    
+                    <strong>Directory structure:</strong><br>
+                    <pre>
+trading-bot/
+├── app.py              (this file)
+├── templates/
+│   └── index.html      (missing file)
+├── config.ini
+└── bot_trading.log
+                    </pre>
+                </div>
+                <p><a href="/test">Go to Test Page</a> | <a href="/api/health">API Health Check</a></p>
+            </div>
+        </body>
+        </html>
+        """
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print("❌ EXCEPTION in index():")
+        print(error_details)
+        
+        return f"""
+        <html>
+        <head><title>Trading Bot - Error</title></head>
+        <body style="font-family: Arial; padding: 50px;">
+            <h1>🚀 Trading Bot</h1>
+            <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin: 20px;">
+                <strong>❌ Rendering error:</strong><br>
+                {str(e)}<br><br>
+                <details>
+                    <summary>Technical details (click to expand)</summary>
+                    <pre style="background: #f8f9fa; padding: 10px; overflow: auto;">{error_details}</pre>
+                </details>
+                <br>
+                Check if file <code>templates/index.html</code> exists and is correct.
+            </div>
+            <p><a href="/test">Try Test Page</a></p>
+        </body>
+        </html>
+        """
     
 
 
@@ -3960,33 +3974,6 @@ def handle_config():
         return jsonify({'success': False, 'error': f'Server error: {str(e)}'}), 500
 
 
-# ============================================
-# HELPER FUNCTION - JWT Token Validation
-# ============================================
-
-def get_user_id_from_token(request):
-    """Extract and validate user_id from JWT token in request headers"""
-    try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return None
-
-        token = auth_header.split(' ')[1]
-
-        # Import AuthMiddleware to validate token
-        from auth_middleware import AuthMiddleware
-        auth = AuthMiddleware()
-        payload = auth.validate_token(token)
-
-        if payload and 'user_id' in payload:
-            return payload['user_id']
-
-        return None
-    except Exception as e:
-        logger.error(f"Error validating token: {e}")
-        return None
-
-
 @app.route('/api/test-connection', methods=['POST'])
 def test_connection():
     """Test API connection"""
@@ -4024,84 +4011,35 @@ def get_subaccounts():
 
 @app.route('/api/profiles', methods=['GET', 'POST'])
 def handle_profiles():
-    """Get all profiles or save new profile - USER SPECIFIC"""
-    # Get user_id from JWT token
-    user_id = get_user_id_from_token(request)
-    if not user_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-
+    """Get all profiles or save new profile"""
     if request.method == 'GET':
-        # Get profiles for this specific user only
-        profiles = bot.profile_manager.get_user_profiles(user_id)
         return jsonify({
             'success': True,
-            'profiles': profiles
+            'profiles': bot.profile_manager.profiles
         })
-
+    
     else:  # POST
         try:
             data = request.json
             name = data.get('name')
-
+            
             if not name:
                 return jsonify({'success': False, 'error': 'Profile name required'}), 400
-
-            # Save profile with user_id
-            profile_data = {
-                'telegram_token': bot.telegram_token,
-                'telegram_chat_id': bot.telegram_chat_id,
-                'bybit_api_key': bot.bybit_api_key,
-                'bybit_api_secret': bot.bybit_api_secret,
-                'bybit_subaccount': bot.bybit_subaccount,
-                'bybit_platform': bot.bybit_platform,
-                'position_mode': bot.position_mode,
-                'default_leverage': bot.default_leverage,
-                'default_amount': bot.default_amount,
-                'use_percentage': bot.use_percentage,
-                'use_demo_account': bot.use_demo_account,
-                'auto_tp_sl': bot.auto_tp_sl,
-                'auto_breakeven': bot.auto_breakeven,
-                'breakeven_after_target': bot.breakeven_after_target,
-                'auto_execute_signals': bot.auto_execute_signals,
-                'max_position_size': bot.max_position_size,
-                'risk_percent': bot.risk_percent,
-                'risk_management_enabled': bot.risk_management_enabled,
-                'daily_loss_limit': bot.daily_loss_limit,
-                'weekly_loss_limit': bot.weekly_loss_limit,
-                'max_consecutive_losses': bot.max_consecutive_losses,
-                'min_margin_level': bot.min_margin_level
-            }
-
-            if bot.profile_manager.save_profile(user_id, name, profile_data):
+            
+            if bot.save_current_as_profile(name):
                 return jsonify({'success': True, 'message': f'Profile {name} saved'})
             else:
                 return jsonify({'success': False, 'error': 'Failed to save profile'}), 500
-
+                
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/profiles/<name>/load', methods=['POST'])
 def load_profile(name):
-    """Load a profile - USER SPECIFIC"""
-    user_id = get_user_id_from_token(request)
-    if not user_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-
+    """Load a profile"""
     try:
-        profile_data = bot.profile_manager.load_profile(user_id, name)
-        if profile_data:
-            # Load profile data into bot
-            bot.telegram_token = profile_data.get('telegram_token', '')
-            bot.telegram_chat_id = profile_data.get('telegram_chat_id', '')
-            bot.bybit_api_key = profile_data.get('bybit_api_key', '')
-            bot.bybit_api_secret = profile_data.get('bybit_api_secret', '')
-            bot.bybit_subaccount = profile_data.get('bybit_subaccount', '')
-            bot.bybit_platform = profile_data.get('bybit_platform', 'bybit')
-            bot.position_mode = profile_data.get('position_mode', 'one-way')
-            bot.default_leverage = profile_data.get('default_leverage', 10)
-            bot.default_amount = profile_data.get('default_amount', 100)
-
+        if bot.load_profile(name):
             return jsonify({'success': True, 'message': f'Profile {name} loaded'})
         else:
             return jsonify({'success': False, 'error': 'Profile not found'}), 404
@@ -4111,13 +4049,9 @@ def load_profile(name):
 
 @app.route('/api/profiles/<name>', methods=['DELETE'])
 def delete_profile(name):
-    """Delete a profile - USER SPECIFIC"""
-    user_id = get_user_id_from_token(request)
-    if not user_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-
+    """Delete a profile"""
     try:
-        if bot.profile_manager.delete_profile(user_id, name):
+        if bot.profile_manager.delete_profile(name):
             return jsonify({'success': True, 'message': f'Profile {name} deleted'})
         else:
             return jsonify({'success': False, 'error': 'Profile not found'}), 404
@@ -4154,79 +4088,6 @@ def update_trading_settings():
             return jsonify({'success': False, 'error': 'Failed to save settings'}), 500
             
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/api/notification-settings', methods=['GET'])
-def get_notification_settings():
-    """Get notification settings for current user"""
-    try:
-        user_id = get_user_id_from_token(request)
-        if not user_id:
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-
-        settings = bot.db.get_notification_settings(user_id)
-        if settings:
-            return jsonify({'success': True, 'settings': settings})
-        else:
-            # Create default settings if they don't exist
-            bot.db.create_default_settings(user_id)
-            settings = bot.db.get_notification_settings(user_id)
-            return jsonify({'success': True, 'settings': settings})
-
-    except Exception as e:
-        logger.error(f"Error getting notification settings: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/api/notification-settings', methods=['POST'])
-def update_notification_settings():
-    """Update notification settings for current user"""
-    try:
-        user_id = get_user_id_from_token(request)
-        if not user_id:
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-
-        data = request.json
-
-        # Build settings dict from request data
-        settings = {}
-
-        # Email settings
-        if 'notification_email' in data:
-            settings['notification_email'] = data['notification_email']
-        if 'email_enabled' in data:
-            settings['email_enabled'] = 1 if data['email_enabled'] else 0
-        if 'email_position_opened' in data:
-            settings['email_position_opened'] = 1 if data['email_position_opened'] else 0
-        if 'email_position_closed' in data:
-            settings['email_position_closed'] = 1 if data['email_position_closed'] else 0
-        if 'email_take_profit' in data:
-            settings['email_take_profit'] = 1 if data['email_take_profit'] else 0
-        if 'email_stop_loss' in data:
-            settings['email_stop_loss'] = 1 if data['email_stop_loss'] else 0
-
-        # Telegram settings
-        if 'telegram_enabled' in data:
-            settings['telegram_enabled'] = 1 if data['telegram_enabled'] else 0
-        if 'telegram_chat_id' in data:
-            settings['telegram_chat_id'] = data['telegram_chat_id']
-        if 'telegram_position_opened' in data:
-            settings['telegram_position_opened'] = 1 if data['telegram_position_opened'] else 0
-        if 'telegram_position_closed' in data:
-            settings['telegram_position_closed'] = 1 if data['telegram_position_closed'] else 0
-        if 'telegram_take_profit' in data:
-            settings['telegram_take_profit'] = 1 if data['telegram_take_profit'] else 0
-        if 'telegram_stop_loss' in data:
-            settings['telegram_stop_loss'] = 1 if data['telegram_stop_loss'] else 0
-
-        # Update settings in database
-        bot.db.update_notification_settings(user_id, settings)
-
-        return jsonify({'success': True, 'message': 'Notification settings updated'})
-
-    except Exception as e:
-        logger.error(f"Error updating notification settings: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

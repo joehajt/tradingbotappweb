@@ -67,14 +67,12 @@
             background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
             color: white;
             padding: 30px;
+            text-align: center;
             margin-bottom: 30px;
             border-radius: 16px;
             box-shadow: var(--shadow-xl);
             position: relative;
             overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
         }
 
         .header::before {
@@ -1129,26 +1127,13 @@
 <body>
     <div class="container">
         <div class="header">
-            <div style="flex: 1;">
-                <h1>🚀 Trading Bot Pro - Enhanced Edition</h1>
-                <p>Advanced Telegram Bot + Forwarder + Console + Risk Management</p>
-            </div>
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <div id="user-info" style="text-align: right; margin-right: 15px;">
-                    <div id="user-name" style="font-weight: 600; color: var(--success-color);"></div>
-                    <div id="user-email" style="font-size: 0.85em; color: #666;"></div>
-                </div>
-                <button onclick="logout()" style="padding: 8px 16px; background: var(--danger-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                    🚪 Wyloguj
-                </button>
-            </div>
+            <h1>🚀 Trading Bot Pro - Enhanced Edition</h1>
+            <p>Advanced Telegram Bot + Forwarder + Console + Risk Management</p>
         </div>
 
         <div class="tabs">
-            <button class="tab-button active" onclick="openTab(event, 'account')">👤 Konto</button>
-            <button class="tab-button" onclick="openTab(event, 'notifications')">🔔 Powiadomienia</button>
-            <button class="tab-button" onclick="openTab(event, 'config')">⚙️ Konfiguracja</button>
-            <button class="tab-button" onclick="openTab(event, 'profiles')">📋 Profile</button>
+            <button class="tab-button active" onclick="openTab(event, 'config')">⚙️ Konfiguracja</button>
+            <button class="tab-button" onclick="openTab(event, 'profiles')">👤 Profile</button>
             <button class="tab-button" onclick="openTab(event, 'trading')">💼 Handel</button>
             <button class="tab-button" onclick="openTab(event, 'risk')">🛡️ Risk Management</button>
             <button class="tab-button" onclick="openTab(event, 'signals')">📊 Sygnały</button>
@@ -1157,252 +1142,10 @@
             <button class="tab-button" onclick="openTab(event, 'console')">💻 Console</button>
             <button class="tab-button" onclick="openTab(event, 'positions')">🎯 Pozycje</button>
             <button class="tab-button" onclick="openTab(event, 'logs')">📝 Logi</button>
-            <button class="tab-button" onclick="openTab(event, 'charts')">📈 Wykresy</button>
-        </div>
-
-        <!-- Account Tab -->
-        <div id="account" class="tab-content active">
-            <div class="section">
-                <h2>👤 Informacje o koncie</h2>
-                <div class="card" style="max-width: 800px; margin: 0 auto;">
-                    <div style="display: grid; gap: 20px;">
-                        <!-- User Profile Section -->
-                        <div style="background: var(--light-bg); padding: 20px; border-radius: 8px;">
-                            <h3 style="margin-bottom: 15px; color: var(--primary-color);">📋 Profil użytkownika</h3>
-                            <div style="display: grid; gap: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Imię i nazwisko:</label>
-                                    <input type="text" id="account-fullname" class="form-control" placeholder="Twoje imię">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Email:</label>
-                                    <input type="email" id="account-email" class="form-control" placeholder="email@example.com" disabled>
-                                    <small style="color: #666;">Email nie może być zmieniony</small>
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Telefon:</label>
-                                    <input type="tel" id="account-phone" class="form-control" placeholder="+48 123 456 789">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Kraj:</label>
-                                    <select id="account-country" class="form-control">
-                                        <option value="PL">🇵🇱 Polska</option>
-                                        <option value="US">🇺🇸 USA</option>
-                                        <option value="GB">🇬🇧 UK</option>
-                                        <option value="DE">🇩🇪 Niemcy</option>
-                                        <option value="FR">🇫🇷 Francja</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Strefa czasowa:</label>
-                                    <select id="account-timezone" class="form-control">
-                                        <option value="Europe/Warsaw">Europe/Warsaw (UTC+1/+2)</option>
-                                        <option value="Europe/London">Europe/London (UTC+0/+1)</option>
-                                        <option value="America/New_York">America/New_York (UTC-5/-4)</option>
-                                        <option value="Asia/Tokyo">Asia/Tokyo (UTC+9)</option>
-                                    </select>
-                                </div>
-                                <button onclick="updateProfile()" class="btn btn-primary" style="width: 100%;">
-                                    💾 Zapisz zmiany profilu
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Change Password Section -->
-                        <div style="background: var(--light-bg); padding: 20px; border-radius: 8px;">
-                            <h3 style="margin-bottom: 15px; color: var(--warning-color);">🔒 Zmiana hasła</h3>
-                            <div style="display: grid; gap: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Obecne hasło:</label>
-                                    <input type="password" id="current-password" class="form-control" placeholder="Twoje obecne hasło">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Nowe hasło:</label>
-                                    <input type="password" id="new-password" class="form-control" placeholder="Minimum 8 znaków">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Potwierdź nowe hasło:</label>
-                                    <input type="password" id="confirm-password" class="form-control" placeholder="Powtórz nowe hasło">
-                                </div>
-                                <button onclick="changePassword()" class="btn" style="width: 100%; background: var(--warning-color); color: white;">
-                                    🔑 Zmień hasło
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Account Stats Section -->
-                        <div style="background: var(--light-bg); padding: 20px; border-radius: 8px;">
-                            <h3 style="margin-bottom: 15px; color: var(--info-color);">📊 Statystyki konta</h3>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                                <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
-                                    <div style="font-size: 2em; margin-bottom: 5px;">📅</div>
-                                    <div style="font-size: 0.9em; color: #666;">Data rejestracji</div>
-                                    <div id="account-created" style="font-weight: 600; color: var(--primary-color);">-</div>
-                                </div>
-                                <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
-                                    <div style="font-size: 2em; margin-bottom: 5px;">🕐</div>
-                                    <div style="font-size: 0.9em; color: #666;">Ostatnie logowanie</div>
-                                    <div id="account-last-login" style="font-weight: 600; color: var(--success-color);">-</div>
-                                </div>
-                                <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
-                                    <div style="font-size: 2em; margin-bottom: 5px;">💻</div>
-                                    <div style="font-size: 0.9em; color: #666;">Aktywne sesje</div>
-                                    <div id="account-sessions" style="font-weight: 600; color: var(--info-color);">-</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- API Keys Section -->
-                        <div style="background: var(--light-bg); padding: 20px; border-radius: 8px;">
-                            <h3 style="margin-bottom: 15px; color: var(--success-color);">🔐 Klucze API (szyfrowane)</h3>
-                            <div style="background: #fffbea; border-left: 4px solid var(--warning-color); padding: 15px; margin-bottom: 15px;">
-                                <strong>ℹ️ Informacja:</strong> Wszystkie klucze API są szyfrowane AES-256 i bezpiecznie przechowywane w bazie danych.
-                            </div>
-                            <div style="display: grid; gap: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Bybit API Key:</label>
-                                    <input type="text" id="account-api-key" class="form-control" placeholder="Twój Bybit API Key">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Bybit API Secret:</label>
-                                    <input type="password" id="account-api-secret" class="form-control" placeholder="Twój Bybit API Secret">
-                                </div>
-                                <button onclick="saveApiKeys()" class="btn btn-success" style="width: 100%;">
-                                    🔐 Zapisz klucze API (szyfrowane)
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Danger Zone -->
-                        <div style="background: #fff5f5; border: 2px solid var(--danger-color); padding: 20px; border-radius: 8px;">
-                            <h3 style="margin-bottom: 15px; color: var(--danger-color);">⚠️ Strefa niebezpieczna</h3>
-                            <p style="margin-bottom: 15px; color: #666;">Usuń konto permanentnie. Tej akcji nie można cofnąć!</p>
-                            <button onclick="deleteAccount()" class="btn" style="width: 100%; background: var(--danger-color); color: white;">
-                                🗑️ Usuń konto
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Notifications Tab -->
-        <div id="notifications" class="tab-content">
-            <div class="section">
-                <h2>🔔 Ustawienia Powiadomień</h2>
-
-                <div class="card">
-                    <h3 style="color: var(--primary-color); margin-bottom: 20px;">📧 Powiadomienia Email</h3>
-
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Email do powiadomień:</label>
-                        <input type="email" id="notification-email" class="form-control" placeholder="twoj@email.com">
-                    </div>
-
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: flex; align-items: center; cursor: pointer;">
-                            <input type="checkbox" id="email-enabled" style="margin-right: 10px;">
-                            <span style="font-weight: 600;">✅ Włącz powiadomienia Email</span>
-                        </label>
-                    </div>
-
-                    <div style="margin-left: 30px; border-left: 3px solid var(--primary-color); padding-left: 15px;">
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: flex; align-items: center; cursor: pointer;">
-                                <input type="checkbox" id="email-position-opened" style="margin-right: 10px;">
-                                <span>🟢 Otwarcie pozycji</span>
-                            </label>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: flex; align-items: center; cursor: pointer;">
-                                <input type="checkbox" id="email-position-closed" style="margin-right: 10px;">
-                                <span>🔴 Zamknięcie pozycji</span>
-                            </label>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: flex; align-items: center; cursor: pointer;">
-                                <input type="checkbox" id="email-take-profit" style="margin-right: 10px;">
-                                <span>✅ Take Profit osiągnięty</span>
-                            </label>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: flex; align-items: center; cursor: pointer;">
-                                <input type="checkbox" id="email-stop-loss" style="margin-right: 10px;">
-                                <span>❌ Stop Loss osiągnięty</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card" style="margin-top: 20px;">
-                    <h3 style="color: var(--primary-color); margin-bottom: 20px;">📱 Powiadomienia Telegram</h3>
-
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Telegram Chat ID:</label>
-                        <input type="text" id="notification-telegram-chat-id" class="form-control" placeholder="123456789">
-                        <small style="color: var(--text-secondary); display: block; margin-top: 5px;">
-                            💡 Aby uzyskać Chat ID, napisz do bota @userinfobot
-                        </small>
-                    </div>
-
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: flex; align-items: center; cursor: pointer;">
-                            <input type="checkbox" id="telegram-enabled" style="margin-right: 10px;">
-                            <span style="font-weight: 600;">✅ Włącz powiadomienia Telegram</span>
-                        </label>
-                    </div>
-
-                    <div style="margin-left: 30px; border-left: 3px solid var(--primary-color); padding-left: 15px;">
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: flex; align-items: center; cursor: pointer;">
-                                <input type="checkbox" id="telegram-position-opened" style="margin-right: 10px;">
-                                <span>🟢 Otwarcie pozycji</span>
-                            </label>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: flex; align-items: center; cursor: pointer;">
-                                <input type="checkbox" id="telegram-position-closed" style="margin-right: 10px;">
-                                <span>🔴 Zamknięcie pozycji</span>
-                            </label>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: flex; align-items: center; cursor: pointer;">
-                                <input type="checkbox" id="telegram-take-profit" style="margin-right: 10px;">
-                                <span>✅ Take Profit osiągnięty</span>
-                            </label>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: flex; align-items: center; cursor: pointer;">
-                                <input type="checkbox" id="telegram-stop-loss" style="margin-right: 10px;">
-                                <span>❌ Stop Loss osiągnięty</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 30px;">
-                    <button class="btn btn-primary" style="padding: 15px 40px; font-size: 16px;" onclick="saveNotificationSettings()">
-                        💾 Zapisz Ustawienia Powiadomień
-                    </button>
-                </div>
-
-                <div class="card" style="margin-top: 30px; background: var(--light-bg);">
-                    <h4 style="margin-bottom: 15px;">ℹ️ Informacje o powiadomieniach</h4>
-                    <ul style="line-height: 1.8; color: var(--text-secondary);">
-                        <li>📊 <strong>Otwarcie pozycji:</strong> Powiadomienie zawiera symbol, lewar, kwotę, cenę wejścia i godzinę otwarcia</li>
-                        <li>📊 <strong>Zamknięcie pozycji:</strong> Zawiera dodatkowo cenę wyjścia, godzinę zamknięcia i PNL</li>
-                        <li>✅ <strong>Take Profit:</strong> Specjalne powiadomienie gdy osiągnięto cel zysku</li>
-                        <li>❌ <strong>Stop Loss:</strong> Powiadomienie gdy aktywowano stop loss</li>
-                        <li>🔒 <strong>Bezpieczeństwo:</strong> Wszystkie ustawienia są przypisane do Twojego konta</li>
-                        <li>📧 <strong>Email:</strong> Wymaga konfiguracji SMTP (skontaktuj się z administratorem)</li>
-                        <li>📱 <strong>Telegram:</strong> Wymaga konfiguracji bota Telegram w zakładce "Telegram Bot"</li>
-                    </ul>
-                </div>
-            </div>
         </div>
 
         <!-- Config Tab -->
-        <div id="config" class="tab-content">
+        <div id="config" class="tab-content active">
             <div class="section">
                 <h2 class="section-title">⚙️ KONFIGURACJA API</h2>
                 
@@ -2145,13 +1888,13 @@ _____
         <div id="logs" class="tab-content">
             <div class="section">
                 <h2 class="section-title">📝 LOGI SYSTEMOWE</h2>
-
+                
                 <div>
                     <button class="btn btn-primary" onclick="refreshLogs()">🔄 Odśwież Logi</button>
                     <button class="btn btn-danger" onclick="clearLogs()">🗑️ Wyczyść Logi</button>
                     <button class="btn btn-info" onclick="exportLogs()">💾 Eksportuj do Pliku</button>
                 </div>
-
+                
                 <div class="section" style="margin-top: 15px;">
                     <h3 class="section-title">📄 Historia Działań</h3>
                     <div id="logs-output" class="console" style="height: 500px;">
@@ -2160,153 +1903,6 @@ _____
                 </div>
             </div>
         </div>
-
-        <!-- Charts Tab -->
-        <div id="charts" class="tab-content">
-            <div class="section">
-                <h2 class="section-title">📈 WYKRESY KRYPTOWALUT</h2>
-
-                <!-- Bitcoin Chart -->
-                <div class="card" style="margin-bottom: 30px;">
-                    <div style="padding: 10px 0;">
-                        <h3 style="color: var(--primary-color); margin-bottom: 10px;">₿ Bitcoin (BTC/USD)</h3>
-                        <p style="color: var(--text-secondary); margin-bottom: 15px;">
-                            📊 Wykres Bitcoin z TradingView - pełna analiza techniczna i wskaźniki
-                        </p>
-                    </div>
-                    <div class="tradingview-widget-container" style="height: 1800px; width: 100%;">
-                        <div id="tradingview_chart_btc" style="height: 100%; width: 100%;"></div>
-                    </div>
-                </div>
-
-                <!-- PAXG Chart -->
-                <div class="card" style="margin-bottom: 30px;">
-                    <div style="padding: 10px 0;">
-                        <h3 style="color: var(--primary-color); margin-bottom: 10px;">🪙 PAX Gold (PAXG/USDT)</h3>
-                        <p style="color: var(--text-secondary); margin-bottom: 15px;">
-                            📊 Wykres PAX Gold z TradingView - złoto na blockchainie
-                        </p>
-                    </div>
-                    <div class="tradingview-widget-container" style="height: 1800px; width: 100%;">
-                        <div id="tradingview_chart_paxg" style="height: 100%; width: 100%;"></div>
-                    </div>
-                </div>
-
-                <!-- SUI Chart -->
-                <div class="card" style="margin-bottom: 30px;">
-                    <div style="padding: 10px 0;">
-                        <h3 style="color: var(--primary-color); margin-bottom: 10px;">🔷 SUI (SUI/USDT)</h3>
-                        <p style="color: var(--text-secondary); margin-bottom: 15px;">
-                            📊 Wykres SUI z TradingView - pełna analiza techniczna i wskaźniki
-                        </p>
-                    </div>
-                    <div class="tradingview-widget-container" style="height: 1800px; width: 100%;">
-                        <div id="tradingview_chart_sui" style="height: 100%; width: 100%;"></div>
-                    </div>
-                </div>
-
-                <!-- ZND Chart -->
-                <div class="card">
-                    <div style="padding: 10px 0;">
-                        <h3 style="color: var(--primary-color); margin-bottom: 10px;">💎 ZND/USD</h3>
-                        <p style="color: var(--text-secondary); margin-bottom: 15px;">
-                            📊 Wykres ZND z TradingView - analiza techniczna
-                        </p>
-                    </div>
-                    <div class="tradingview-widget-container" style="height: 1800px; width: 100%;">
-                        <div id="tradingview_chart_znd" style="height: 100%; width: 100%;"></div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 15px; padding: 10px; background: var(--light-bg); border-radius: 8px;">
-                    <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">
-                        ℹ️ Wykresy aktualizują się automatycznie. Kliknij symbol aby zmienić parę. Wszystkie narzędzia TradingView są dostępne.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- TradingView Library and Widget Initialization -->
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script type="text/javascript">
-            // Initialize charts when tab is opened or on page load
-            let chartsInitialized = false;
-
-            function initializeTradingViewCharts() {
-                if (chartsInitialized) return;
-                chartsInitialized = true;
-
-                // Bitcoin Chart
-                new TradingView.widget({
-                    "width": "100%",
-                    "height": "100%",
-                    "symbol": "BINANCE:BTCUSD",
-                    "interval": "D",
-                    "timezone": "Etc/UTC",
-                    "theme": "dark",
-                    "style": "1",
-                    "locale": "pl",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "allow_symbol_change": true,
-                    "container_id": "tradingview_chart_btc"
-                });
-
-                // PAXG Chart
-                new TradingView.widget({
-                    "width": "100%",
-                    "height": "100%",
-                    "symbol": "BINANCE:PAXGUSDT",
-                    "interval": "D",
-                    "timezone": "Etc/UTC",
-                    "theme": "dark",
-                    "style": "1",
-                    "locale": "pl",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "allow_symbol_change": true,
-                    "container_id": "tradingview_chart_paxg"
-                });
-
-                // SUI Chart
-                new TradingView.widget({
-                    "width": "100%",
-                    "height": "100%",
-                    "symbol": "BINANCE:SUIUSDT",
-                    "interval": "D",
-                    "timezone": "Etc/UTC",
-                    "theme": "dark",
-                    "style": "1",
-                    "locale": "pl",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "allow_symbol_change": true,
-                    "container_id": "tradingview_chart_sui"
-                });
-
-                // ZND Chart
-                new TradingView.widget({
-                    "width": "100%",
-                    "height": "100%",
-                    "symbol": "CRYPTO:ZNDUSD",
-                    "interval": "D",
-                    "timezone": "Etc/UTC",
-                    "theme": "dark",
-                    "style": "1",
-                    "locale": "pl",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "allow_symbol_change": true,
-                    "container_id": "tradingview_chart_znd"
-                });
-            }
-
-            // Initialize charts when DOM is ready and TradingView library is loaded
-            window.addEventListener('load', function() {
-                // Small delay to ensure TradingView library is fully loaded
-                setTimeout(initializeTradingViewCharts, 1000);
-            });
-        </script>
     </div>
 
     <!-- Modals -->
@@ -2342,32 +1938,9 @@ _____
     <!-- JavaScript -->
     <script>
         // ============================
-        // AUTHENTICATION CHECK
-        // ============================
-        // Check if user is authenticated
-        (function checkAuth() {
-            const token = localStorage.getItem('token');
-            const user = localStorage.getItem('user');
-
-            if (!token || !user) {
-                // Not logged in, redirect to login page
-                window.location.href = '/';
-                return;
-            }
-
-            // Display user info (optional)
-            try {
-                const userData = JSON.parse(user);
-                console.log('Logged in as:', userData.email || userData.full_name);
-            } catch (e) {
-                console.error('Error parsing user data');
-            }
-        })();
-
-        // ============================
         // COMPLETE JAVASCRIPT CODE WITH TELETHON CONSOLE INTEGRATION
         // ============================
-
+        
         // Global variables
         let config = {};
         let lastSignal = null;
@@ -2524,19 +2097,12 @@ _____
 
         // Enhanced API request with better error handling
         async function apiRequest(endpoint, method = 'GET', data = null) {
-            const token = localStorage.getItem('token');
-
             const options = {
                 method: method,
                 headers: {
                     'Content-Type': 'application/json'
                 }
             };
-
-            // Add JWT token for authentication
-            if (token) {
-                options.headers['Authorization'] = `Bearer ${token}`;
-            }
 
             if (data) {
                 options.body = JSON.stringify(data);
@@ -2546,22 +2112,6 @@ _____
                 const response = await fetch(`/api/${endpoint}`, options);
                 const result = await response.json();
 
-                // Handle 401 Unauthorized - token expired or invalid
-                if (response.status === 401) {
-                    console.log('Token expired or invalid, redirecting to login...');
-                    showNotification('Sesja wygasła. Zaloguj się ponownie.', 'warning');
-
-                    // Clear storage and redirect
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-
-                    throw new Error('Unauthorized - token expired');
-                }
-
                 if (!response.ok) {
                     throw new Error(result.error || `API request failed: ${response.status}`);
                 }
@@ -2569,12 +2119,7 @@ _____
                 return result;
             } catch (error) {
                 console.error('API request error:', error);
-
-                // Don't show notification if it's a 401 (already handled above)
-                if (!error.message.includes('Unauthorized')) {
-                    showNotification(`Error: ${error.message}`, 'error');
-                }
-
+                showNotification(`Error: ${error.message}`, 'error');
                 throw error;
             }
         }
@@ -2601,12 +2146,6 @@ _____
         // Load tab-specific data
         function loadTabData(tabName) {
             switch (tabName) {
-                case 'account':
-                    loadAccountData();
-                    break;
-                case 'notifications':
-                    loadNotificationSettings();
-                    break;
                 case 'profiles':
                     refreshProfiles();
                     break;
@@ -3893,435 +3432,13 @@ _____
             
             // Load initial configuration
             await loadConfig();
-
+            
             // Load initial trading settings
             await loadTradingSettings();
-
-            // Load and display user info
-            loadUserInfo();
-
+            
             // Connect to Socket.IO is already done at the beginning
-
+            
             console.log('✅ Application ready');
-        });
-
-        // ============================
-        // USER MANAGEMENT FUNCTIONS
-        // ============================
-
-        function loadUserInfo() {
-            try {
-                const userData = JSON.parse(localStorage.getItem('user'));
-                if (userData) {
-                    document.getElementById('user-name').textContent = userData.full_name || 'User';
-                    document.getElementById('user-email').textContent = userData.email || '';
-                }
-            } catch (e) {
-                console.error('Error loading user info:', e);
-            }
-        }
-
-        async function logout() {
-            if (!confirm('Czy na pewno chcesz się wylogować?')) {
-                return;
-            }
-
-            try {
-                const token = localStorage.getItem('token');
-
-                // Call logout API endpoint
-                if (token) {
-                    await fetch('/api/auth/logout', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                }
-            } catch (e) {
-                console.error('Logout error:', e);
-            } finally {
-                // Clear local storage
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-
-                // Redirect to login
-                window.location.href = '/';
-            }
-        }
-
-        // ============================
-        // ACCOUNT MANAGEMENT FUNCTIONS
-        // ============================
-
-        async function loadAccountData() {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await fetch('/api/auth/profile', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                const data = await response.json();
-
-                if (data.success && data.user) {
-                    const user = data.user;
-
-                    // Fill profile fields
-                    document.getElementById('account-fullname').value = user.full_name || '';
-                    document.getElementById('account-email').value = user.email || '';
-                    document.getElementById('account-phone').value = user.phone || '';
-                    document.getElementById('account-country').value = user.country || 'PL';
-                    document.getElementById('account-timezone').value = user.timezone || 'Europe/Warsaw';
-
-                    // Fill stats
-                    document.getElementById('account-created').textContent = user.created_at ? new Date(user.created_at).toLocaleDateString('pl-PL') : '-';
-                    document.getElementById('account-last-login').textContent = user.last_login ? new Date(user.last_login).toLocaleString('pl-PL') : '-';
-                    document.getElementById('account-sessions').textContent = user.active_sessions || '1';
-
-                    // Fill API keys if available (masked)
-                    if (user.api_key) {
-                        document.getElementById('account-api-key').value = user.api_key;
-                    }
-                }
-            } catch (e) {
-                console.error('Error loading account data:', e);
-                showNotification('❌ Błąd ładowania danych konta', 'error');
-            }
-        }
-
-        async function updateProfile() {
-            try {
-                const token = localStorage.getItem('token');
-                const fullName = document.getElementById('account-fullname').value;
-                const phone = document.getElementById('account-phone').value;
-                const country = document.getElementById('account-country').value;
-                const timezone = document.getElementById('account-timezone').value;
-
-                if (!fullName) {
-                    showNotification('❌ Imię i nazwisko jest wymagane', 'error');
-                    return;
-                }
-
-                if (!token) {
-                    showNotification('⚠️ Sesja wygasła. Zaloguj się ponownie.', 'warning');
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                    return;
-                }
-
-                const response = await fetch('/api/auth/update-profile', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        full_name: fullName,
-                        phone: phone,
-                        country: country,
-                        timezone: timezone
-                    })
-                });
-
-                // Handle 401 Unauthorized - token expired
-                if (response.status === 401) {
-                    console.log('Token expired, redirecting to login...');
-                    showNotification('⚠️ Sesja wygasła. Zaloguj się ponownie.', 'warning');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                    return;
-                }
-
-                const data = await response.json();
-
-                if (data.success) {
-                    // Update localStorage
-                    const userData = JSON.parse(localStorage.getItem('user'));
-                    userData.full_name = fullName;
-                    localStorage.setItem('user', JSON.stringify(userData));
-
-                    // Update UI
-                    loadUserInfo();
-
-                    showNotification('✅ Profil zaktualizowany pomyślnie!', 'success');
-                } else {
-                    showNotification('❌ ' + (data.error || 'Błąd aktualizacji profilu'), 'error');
-                }
-            } catch (e) {
-                console.error('Error updating profile:', e);
-                showNotification('❌ Błąd połączenia z serwerem', 'error');
-            }
-        }
-
-        async function changePassword() {
-            try {
-                const currentPassword = document.getElementById('current-password').value;
-                const newPassword = document.getElementById('new-password').value;
-                const confirmPassword = document.getElementById('confirm-password').value;
-
-                if (!currentPassword || !newPassword || !confirmPassword) {
-                    showNotification('❌ Wszystkie pola są wymagane', 'error');
-                    return;
-                }
-
-                if (newPassword !== confirmPassword) {
-                    showNotification('❌ Nowe hasła nie są identyczne', 'error');
-                    return;
-                }
-
-                if (newPassword.length < 8) {
-                    showNotification('❌ Nowe hasło musi mieć minimum 8 znaków', 'error');
-                    return;
-                }
-
-                const token = localStorage.getItem('token');
-
-                if (!token) {
-                    showNotification('⚠️ Sesja wygasła. Zaloguj się ponownie.', 'warning');
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                    return;
-                }
-
-                const response = await fetch('/api/auth/change-password', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        current_password: currentPassword,
-                        new_password: newPassword
-                    })
-                });
-
-                // Handle 401 Unauthorized - token expired
-                if (response.status === 401) {
-                    console.log('Token expired, redirecting to login...');
-                    showNotification('⚠️ Sesja wygasła. Zaloguj się ponownie.', 'warning');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                    return;
-                }
-
-                const data = await response.json();
-
-                if (data.success) {
-                    // Clear password fields
-                    document.getElementById('current-password').value = '';
-                    document.getElementById('new-password').value = '';
-                    document.getElementById('confirm-password').value = '';
-
-                    showNotification('✅ Hasło zmienione pomyślnie!', 'success');
-                } else {
-                    showNotification('❌ ' + (data.error || 'Błąd zmiany hasła'), 'error');
-                }
-            } catch (e) {
-                console.error('Error changing password:', e);
-                showNotification('❌ Błąd połączenia z serwerem', 'error');
-            }
-        }
-
-        async function saveApiKeys() {
-            try {
-                const apiKey = document.getElementById('account-api-key').value;
-                const apiSecret = document.getElementById('account-api-secret').value;
-
-                if (!apiKey || !apiSecret) {
-                    showNotification('❌ Oba klucze API są wymagane', 'error');
-                    return;
-                }
-
-                const token = localStorage.getItem('token');
-
-                if (!token) {
-                    showNotification('⚠️ Sesja wygasła. Zaloguj się ponownie.', 'warning');
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                    return;
-                }
-
-                const response = await fetch('/api/auth/save-api-keys', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        api_key: apiKey,
-                        api_secret: apiSecret
-                    })
-                });
-
-                // Handle 401 Unauthorized - token expired
-                if (response.status === 401) {
-                    console.log('Token expired, redirecting to login...');
-                    showNotification('⚠️ Sesja wygasła. Zaloguj się ponownie.', 'warning');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                    return;
-                }
-
-                const data = await response.json();
-
-                if (data.success) {
-                    // Clear secret field for security
-                    document.getElementById('account-api-secret').value = '';
-
-                    showNotification('✅ Klucze API zapisane i zaszyfrowane!', 'success');
-                } else {
-                    showNotification('❌ ' + (data.error || 'Błąd zapisywania kluczy'), 'error');
-                }
-            } catch (e) {
-                console.error('Error saving API keys:', e);
-                showNotification('❌ Błąd połączenia z serwerem', 'error');
-            }
-        }
-
-        async function deleteAccount() {
-            if (!confirm('⚠️ CZY NA PEWNO CHCESZ USUNĄĆ KONTO?\n\nTej akcji NIE MOŻNA cofnąć!\nWszystkie dane zostaną permanentnie usunięte.')) {
-                return;
-            }
-
-            if (!confirm('To jest ostatnie ostrzeżenie! Potwierdź usunięcie konta.')) {
-                return;
-            }
-
-            try {
-                const token = localStorage.getItem('token');
-
-                if (!token) {
-                    showNotification('⚠️ Sesja wygasła. Zaloguj się ponownie.', 'warning');
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                    return;
-                }
-
-                const response = await fetch('/api/auth/delete-account', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                // Handle 401 Unauthorized - token expired
-                if (response.status === 401) {
-                    console.log('Token expired, redirecting to login...');
-                    showNotification('⚠️ Sesja wygasła. Zaloguj się ponownie.', 'warning');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                    return;
-                }
-
-                const data = await response.json();
-
-                if (data.success) {
-                    showNotification('✅ Konto zostało usunięte', 'success');
-
-                    // Logout after 2 seconds
-                    setTimeout(() => {
-                        localStorage.clear();
-                        window.location.href = '/';
-                    }, 2000);
-                } else {
-                    showNotification('❌ ' + (data.error || 'Błąd usuwania konta'), 'error');
-                }
-            } catch (e) {
-                console.error('Error deleting account:', e);
-                showNotification('❌ Błąd połączenia z serwerem', 'error');
-            }
-        }
-
-        // ============================================
-        // NOTIFICATION SETTINGS FUNCTIONS
-        // ============================================
-
-        async function loadNotificationSettings() {
-            try {
-                const result = await apiRequest('user/notifications', 'GET');
-
-                if (result.success && result.settings) {
-                    const s = result.settings;
-
-                    // Email settings
-                    document.getElementById('notification-email').value = s.notification_email || '';
-                    document.getElementById('email-enabled').checked = s.email_enabled == 1;
-                    document.getElementById('email-position-opened').checked = s.email_position_opened == 1;
-                    document.getElementById('email-position-closed').checked = s.email_position_closed == 1;
-                    document.getElementById('email-take-profit').checked = s.email_take_profit == 1;
-                    document.getElementById('email-stop-loss').checked = s.email_stop_loss == 1;
-
-                    // Telegram settings
-                    document.getElementById('notification-telegram-chat-id').value = s.telegram_chat_id || '';
-                    document.getElementById('telegram-enabled').checked = s.telegram_enabled == 1;
-                    document.getElementById('telegram-position-opened').checked = s.telegram_position_opened == 1;
-                    document.getElementById('telegram-position-closed').checked = s.telegram_position_closed == 1;
-                    document.getElementById('telegram-take-profit').checked = s.telegram_take_profit == 1;
-                    document.getElementById('telegram-stop-loss').checked = s.telegram_stop_loss == 1;
-                }
-            } catch (error) {
-                console.error('Error loading notification settings:', error);
-                showNotification('❌ Błąd ładowania ustawień powiadomień', 'error');
-            }
-        }
-
-        async function saveNotificationSettings() {
-            try {
-                const settings = {
-                    notification_email: document.getElementById('notification-email').value,
-                    email_enabled: document.getElementById('email-enabled').checked,
-                    email_position_opened: document.getElementById('email-position-opened').checked,
-                    email_position_closed: document.getElementById('email-position-closed').checked,
-                    email_take_profit: document.getElementById('email-take-profit').checked,
-                    email_stop_loss: document.getElementById('email-stop-loss').checked,
-                    telegram_chat_id: document.getElementById('notification-telegram-chat-id').value,
-                    telegram_enabled: document.getElementById('telegram-enabled').checked,
-                    telegram_position_opened: document.getElementById('telegram-position-opened').checked,
-                    telegram_position_closed: document.getElementById('telegram-position-closed').checked,
-                    telegram_take_profit: document.getElementById('telegram-take-profit').checked,
-                    telegram_stop_loss: document.getElementById('telegram-stop-loss').checked
-                };
-
-                const result = await apiRequest('user/notifications', 'PUT', settings);
-
-                if (result.success) {
-                    showNotification('✅ Ustawienia powiadomień zapisane!', 'success');
-                } else {
-                    showNotification('❌ ' + (result.error || 'Błąd zapisu'), 'error');
-                }
-            } catch (error) {
-                console.error('Error saving notification settings:', error);
-                showNotification('❌ Błąd zapisywania ustawień', 'error');
-            }
-        }
-
-        // Load account data when account tab is opened
-        window.addEventListener('DOMContentLoaded', () => {
-            // Load account data if on account tab
-            const accountTab = document.getElementById('account');
-            if (accountTab && accountTab.classList.contains('active')) {
-                loadAccountData();
-            }
         });
     </script>
 </body>

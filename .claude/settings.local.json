@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile:*)",
+      "Bash(python -c:*)",
+      "Bash(nul)",
+      "Bash(python fix_emojis.py:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(python app.py:*)",
+      "Bash(timeout 3 bash:*)",
+      "Bash(ping:*)",
+      "Bash(curl:*)",
+      "Bash(timeout 5 bash -c \"while ! curl -s http://127.0.0.1:5001/ > nul 2>&1; do sleep 1; done; echo Server is up\")",
+      "Bash(timeout 2 bash:*)",
+      "Bash(del /S /Q *.pyc 2)",
+      "Bash(del /S /Q __pycache__ 2)",
+      "Bash(timeout 5 bash -c \"while ! curl -s http://127.0.0.1:5001/ > nul 2>&1; do sleep 1; done; echo Server ready\")",
+      "Bash(taskkill:*)",
+      "Bash(copy:*)",
+      "Bash(copy \"templates\\index.html\" \"backups\\backup_2025-11-23_working\\index.html\")",
+      "Bash(echo:*)",
+      "Bash(dir:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

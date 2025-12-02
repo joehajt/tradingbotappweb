@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logowanie - Trading Bot Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            max-width: 400px;
+            width: 100%;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .login-header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .login-header p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .login-body {
+            padding: 40px 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .form-links {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .form-links a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.3s ease;
+        }
+
+        .form-links a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+
+        .divider {
+            text-align: center;
+            margin: 20px 0;
+            color: #999;
+            font-size: 0.9rem;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+        }
+
+        .alert-error {
+            background: #fee;
+            color: #c33;
+            border: 1px solid #fcc;
+        }
+
+        .alert-success {
+            background: #efe;
+            color: #3c3;
+            border: 1px solid #cfc;
+        }
+
+        .alert-info {
+            background: #eef;
+            color: #33c;
+            border: 1px solid #ccf;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .password-toggle {
+            position: relative;
+        }
+
+        .password-toggle button {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #999;
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                border-radius: 0;
+            }
+            
+            .login-header {
+                padding: 30px 20px;
+            }
+            
+            .login-body {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>🚀 Trading Bot Pro</h1>
+            <p id="header-text">Zaloguj się do swojego konta</p>
+        </div>
+
+        <div class="login-body">
+            <div id="alert-container"></div>
+
+            <!-- FORMULARZ LOGOWANIA -->
+            <form id="login-form" style="display: block;">
+                <div class="form-group">
+                    <label for="username">Nazwa użytkownika lub Email</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Hasło</label>
+                    <div class="password-toggle">
+                        <input type="password" id="password" name="password" required autocomplete="current-password">
+                        <button type="button" onclick="togglePassword('password')">👁️</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-login" id="login-btn">
+                    Zaloguj się
+                </button>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                </div>
+
+                <div class="form-links">
+                    <a href="#" onclick="showRegisterForm(); return false;" style="font-weight: 600;">Nie masz konta? Zarejestruj się</a>
+                </div>
+            </form>
+
+            <!-- FORMULARZ REJESTRACJI -->
+            <form id="register-form" style="display: none;">
+                <div class="form-group">
+                    <label for="reg-username">Imię i nazwisko</label>
+                    <input type="text" id="reg-username" name="fullname" required autocomplete="name" placeholder="Jan Kowalski">
+                </div>
+
+                <div class="form-group">
+                    <label for="reg-email">Email</label>
+                    <input type="email" id="reg-email" name="email" required autocomplete="email">
+                </div>
+
+                <div class="form-group">
+                    <label for="reg-password">Hasło</label>
+                    <div class="password-toggle">
+                        <input type="password" id="reg-password" name="password" required autocomplete="new-password" minlength="8">
+                        <button type="button" onclick="togglePassword('reg-password')">👁️</button>
+                    </div>
+                    <small>Minimum 8 znaków</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="reg-password-confirm">Potwierdź hasło</label>
+                    <div class="password-toggle">
+                        <input type="password" id="reg-password-confirm" name="password-confirm" required autocomplete="new-password" minlength="8">
+                        <button type="button" onclick="togglePassword('reg-password-confirm')">👁️</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-login" id="register-btn">
+                    Zarejestruj się
+                </button>
+
+                <div class="loading" id="register-loading">
+                    <div class="spinner"></div>
+                </div>
+
+                <div class="form-links">
+                    <a href="#" onclick="showLoginForm(); return false;" style="font-weight: 600;">Masz już konto? Zaloguj się</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Sprawdź czy użytkownik jest już zalogowany
+        fetch('/api/user/profile')
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/dashboard';
+                }
+            });
+
+        // Sprawdź parametry URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('verified') === '1') {
+            showAlert('Email został zweryfikowany! Możesz się teraz zalogować.', 'success');
+        }
+        if (urlParams.get('reset') === '1') {
+            showAlert('Hasło zostało zmienione! Możesz się teraz zalogować.', 'success');
+        }
+
+        function togglePassword(fieldId) {
+            const passwordInput = document.getElementById(fieldId);
+            passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+        }
+
+        function showLoginForm() {
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('register-form').style.display = 'none';
+            document.getElementById('header-text').textContent = 'Zaloguj się do swojego konta';
+        }
+
+        function showRegisterForm() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'block';
+            document.getElementById('header-text').textContent = 'Utwórz nowe konto';
+        }
+
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alert-container');
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 5000);
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('login-btn');
+            const loading = document.getElementById('loading');
+
+            loginBtn.disabled = true;
+            loading.classList.add('show');
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email: username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Store JWT token and user info
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+
+                    showAlert('Logowanie pomyślne! Przekierowywanie...', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 1000);
+                } else {
+                    showAlert(data.error || data.message || 'Błąd logowania', 'error');
+                    loginBtn.disabled = false;
+                    loading.classList.remove('show');
+                }
+            } catch (error) {
+                showAlert('Błąd połączenia z serwerem', 'error');
+                loginBtn.disabled = false;
+                loading.classList.remove('show');
+            }
+        });
+
+        // Handler formularza rejestracji
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const fullName = document.getElementById('reg-username').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const passwordConfirm = document.getElementById('reg-password-confirm').value;
+            const registerBtn = document.getElementById('register-btn');
+            const loading = document.getElementById('register-loading');
+
+            // Walidacja hasła
+            if (password !== passwordConfirm) {
+                showAlert('Hasła nie są identyczne!', 'error');
+                return;
+            }
+
+            if (password.length < 8) {
+                showAlert('Hasło musi mieć minimum 8 znaków!', 'error');
+                return;
+            }
+
+            registerBtn.disabled = true;
+            loading.classList.add('show');
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        full_name: fullName,
+                        email: email,
+                        password: password,
+                        country: 'PL',
+                        timezone: 'Europe/Warsaw'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Zapisz token i dane użytkownika
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+
+                    showAlert('Rejestracja pomyślna! Przekierowywanie do panelu...', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 1500);
+                } else {
+                    showAlert(data.error || data.message || 'Błąd rejestracji', 'error');
+                }
+            } catch (error) {
+                showAlert('Błąd połączenia z serwerem', 'error');
+            } finally {
+                registerBtn.disabled = false;
+                loading.classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>
