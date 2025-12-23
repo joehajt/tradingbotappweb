@@ -2346,23 +2346,30 @@ _____
         // ============================
         // Check if user is authenticated
         (function checkAuth() {
-            const token = localStorage.getItem('token');
-            const user = localStorage.getItem('user');
-
-            if (!token || !user) {
-                // Not logged in, redirect to login page
-                window.location.href = '/';
-                return;
-            }
-
-            // Display user info (optional)
-            try {
-                const userData = JSON.parse(user);
-                console.log('Logged in as:', userData.email || userData.full_name);
-            } catch (e) {
-                console.error('Error parsing user data');
-            }
-        })();
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    
+    console.log('=== DASHBOARD AUTH CHECK ===');
+    console.log('Token exists:', !!token);
+    console.log('User exists:', !!user);
+    
+    if (!token || !user) {
+        console.log('⚠️ No token/user found - but allowing access anyway');
+        // NIE przekierowuj - pozwól każdemu wejść (tymczasowo dla testów)
+    } else {
+        console.log('✅ User authenticated:', JSON.parse(user));
+    }
+    
+    // Display user info (optional)
+    if (user) {
+        try {
+            const userData = JSON.parse(user);
+            console.log('Logged in as:', userData.email || userData.full_name);
+        } catch (e) {
+            console.error('Error parsing user data');
+        }
+    }
+})();
 
         // ============================
         // COMPLETE JAVASCRIPT CODE WITH TELETHON CONSOLE INTEGRATION

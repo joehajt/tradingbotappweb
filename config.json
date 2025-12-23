@@ -1,0 +1,9 @@
+{
+    "notifications": {
+        "email_enabled": true,
+        "telegram_enabled": false,
+        "push_enabled": false,
+        "email": "",
+        "telegram_chat_id": ""
+    }
+}

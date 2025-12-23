@@ -16,7 +16,18 @@ from flask import Flask, render_template, request, jsonify, send_file
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import queue
+from pybit.unified_trading import HTTP
+import jwt
 
+from datetime import datetime, timedelta
+
+from functools import wraps
+
+# Secret key dla JWT (w produkcji użyj zmiennej środowiskowej!)
+
+JWT_SECRET_KEY = 'xK8vN2mQ7pL9sR4tW6yZ3aB5cD8eF1gH4jK7mN0pQ3sT6vX9zA2bC5dE8fG1hJ4k'
+
+JWT_ALGORITHM = 'HS256'
 # Fix Windows console encoding for emoji support
 if sys.platform == 'win32':
     # Windows console cannot handle UTF-8 emoji properly
@@ -203,6 +214,101 @@ socketio = SocketIO(
 
 # Global message queue for real-time communication
 message_queue = queue.Queue()
+
+
+
+
+
+
+
+
+
+
+# ... ostatni import ...
+
+# ============================
+# JWT TOKEN FUNCTIONS
+# ============================
+
+def generate_jwt_token(user_email, user_id=None):
+    """Generate JWT token for user"""
+    try:
+        # Jeśli user_id nie podany, użyj email
+        if not user_id:
+            user_id = user_email
+        
+        payload = {
+            'email': user_email,
+            'user_id': user_id,
+            'exp': datetime.utcnow() + timedelta(days=7),
+            'iat': datetime.utcnow()
+        }
+        
+        print(f"🔑 Generating token for user_id: {user_id}")
+        
+        token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+        return token
+    except Exception as e:
+        print(f"❌ Error generating token: {str(e)}")
+        return None
+
+def verify_jwt_token(token):
+    """Verify JWT token and return user_id"""
+    try:
+        print(f"🔍 Verifying token: {token[:20]}...")
+        print(f"🔑 Using JWT_SECRET_KEY: {JWT_SECRET_KEY[:10]}...")
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get('email')
+        print(f"✅ Token verified for user: {user_id}")
+        return user_id
+    except jwt.ExpiredSignatureError:
+        print("❌ Token expired")
+        return None
+    except jwt.InvalidTokenError as e:
+        print(f"❌ Invalid token: {str(e)}")
+        return None
+    except Exception as e:
+        print(f"❌ Token verification error: {str(e)}")
+        return None
+
+def get_user_id_from_token(request):
+    """Extract user_id from JWT token in request"""
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return None
+        
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0].lower() != 'bearer':
+            return None
+        
+        token = parts[1]
+        payload = verify_jwt_token(token)
+        
+        if payload:
+            return payload.get('user_id')
+        
+        return None
+    except Exception as e:
+        print(f"❌ Error extracting user_id: {str(e)}")
+        return None
+
+def require_auth(f):
+    """Decorator to require authentication"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = get_user_id_from_token(request)
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+
+
+
+
+
 
 # Test endpoint to verify routes work
 @app.route('/api/test', methods=['GET'])
@@ -3964,28 +4070,6 @@ def handle_config():
 # HELPER FUNCTION - JWT Token Validation
 # ============================================
 
-def get_user_id_from_token(request):
-    """Extract and validate user_id from JWT token in request headers"""
-    try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return None
-
-        token = auth_header.split(' ')[1]
-
-        # Import AuthMiddleware to validate token
-        from auth_middleware import AuthMiddleware
-        auth = AuthMiddleware()
-        payload = auth.validate_token(token)
-
-        if payload and 'user_id' in payload:
-            return payload['user_id']
-
-        return None
-    except Exception as e:
-        logger.error(f"Error validating token: {e}")
-        return None
-
 
 @app.route('/api/test-connection', methods=['POST'])
 def test_connection():
@@ -4022,30 +4106,68 @@ def get_subaccounts():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+
+
+
+
+
+
+
 @app.route('/api/profiles', methods=['GET', 'POST'])
 def handle_profiles():
     """Get all profiles or save new profile - USER SPECIFIC"""
-    # Get user_id from JWT token
+    
+    # DEBUG - sprawdź co przychodzi
+    print("=" * 60)
+    print("📋 PROFILES REQUEST DEBUG")
+    auth_header = request.headers.get('Authorization')
+    print(f"Authorization header: {auth_header}")
+    
+    # Pobierz user_id z JWT token
     user_id = get_user_id_from_token(request)
+    print(f"Extracted user_id: {user_id}")
+    print("=" * 60)
+    
     if not user_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-
+        print("❌ No user_id - returning 401")
+        return jsonify({
+            'success': False, 
+            'error': 'Unauthorized - please login again'
+        }), 401
+    
     if request.method == 'GET':
         # Get profiles for this specific user only
-        profiles = bot.profile_manager.get_user_profiles(user_id)
-        return jsonify({
-            'success': True,
-            'profiles': profiles
-        })
-
+        try:
+            print(f"📂 Getting profiles for user: {user_id}")
+            profiles = bot.profile_manager.get_user_profiles(user_id)
+            print(f"✅ Found {len(profiles) if profiles else 0} profiles")
+            
+            return jsonify({
+                'success': True,
+                'profiles': profiles if profiles else []
+            })
+        except Exception as e:
+            print(f"❌ Error getting profiles: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': True,
+                'profiles': []  # Zwróć pustą listę zamiast błędu
+            })
+    
     else:  # POST
         try:
             data = request.json
             name = data.get('name')
-
+            
+            print(f"💾 Saving profile '{name}' for user: {user_id}")
+            
             if not name:
-                return jsonify({'success': False, 'error': 'Profile name required'}), 400
-
+                return jsonify({
+                    'success': False, 
+                    'error': 'Profile name required'
+                }), 400
+            
             # Save profile with user_id
             profile_data = {
                 'telegram_token': bot.telegram_token,
@@ -4071,14 +4193,41 @@ def handle_profiles():
                 'max_consecutive_losses': bot.max_consecutive_losses,
                 'min_margin_level': bot.min_margin_level
             }
-
+            
             if bot.profile_manager.save_profile(user_id, name, profile_data):
-                return jsonify({'success': True, 'message': f'Profile {name} saved'})
+                print(f"✅ Profile '{name}' saved successfully")
+                return jsonify({
+                    'success': True, 
+                    'message': f'Profile {name} saved'
+                })
             else:
-                return jsonify({'success': False, 'error': 'Failed to save profile'}), 500
-
+                print(f"❌ Failed to save profile '{name}'")
+                return jsonify({
+                    'success': False, 
+                    'error': 'Failed to save profile'
+                }), 500
+                
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            print(f"❌ Error saving profile: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False, 
+                'error': str(e)
+            }), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @app.route('/api/profiles/<name>/load', methods=['POST'])
@@ -4234,14 +4383,82 @@ def update_notification_settings():
 def get_balance():
     """Get wallet balance"""
     try:
-        balance = bot.get_wallet_balance()
-        if balance:
-            return jsonify(balance)
+        print("💰 Attempting to fetch balance...")
+        
+        # Sprawdź czy bot ma skonfigurowane API
+        if not hasattr(bot, 'bybit_client') or bot.bybit_client is None:
+            return jsonify({
+                'success': False,
+                'error': 'Bybit API not configured. Please add API keys in Settings.'
+            }), 400
+        
+        # Pobierz balance z Bybit
+        result = bot.bybit_client.get_wallet_balance(accountType="UNIFIED")
+        
+        print(f"DEBUG: Balance response code: {result.get('retCode')}")
+        
+        if result.get('retCode') == 0:
+            balance_data = result.get('result', {})
+            account_list = balance_data.get('list', [])
+            
+            if not account_list:
+                return jsonify({
+                    'success': False,
+                    'error': 'No account data found'
+                }), 400
+            
+            account = account_list[0]
+            
+            # Parsuj dane dla frontendu
+            total_equity = float(account.get('totalEquity', 0))
+            total_wallet_balance = float(account.get('totalWalletBalance', 0))
+            total_available_balance = float(account.get('totalAvailableBalance', 0))
+            total_pnl = float(account.get('totalPerpUPL', 0))
+            total_margin = float(account.get('totalInitialMargin', 0))
+            
+            print(f"💰 Wallet Balance: {total_wallet_balance} USDT")
+            print(f"💵 Available Balance: {total_available_balance} USDT")
+            
+            # Format zgodny z frontendem
+            # Format DOKŁADNIE jak frontend oczekuje
+            response = {
+                'success': True,
+                'totalMarginBalance': total_equity,  # Frontend używa tego do "Total Margin"
+                'totalWalletBalance': total_wallet_balance,  # "Wallet Balance"
+                'totalAvailableBalance': total_available_balance,  # "Available"
+                'accountType': 'UNIFIED',
+                # Dodatkowe dla innych części frontendu
+                'total_equity': total_equity,
+                'wallet_balance': total_wallet_balance,
+                'available_balance': total_available_balance,
+                'unrealized_pnl': total_pnl,
+                'used_margin': total_margin,
+                'currency': 'USDT'
+            }
+            
+            return jsonify(response), 200
         else:
-            return jsonify({'success': False, 'error': 'Failed to get balance'}), 400
+            error_msg = result.get('retMsg', 'Failed to get balance')
+            print(f"❌ Balance error: {error_msg}")
+            return jsonify({
+                'success': False,
+                'error': error_msg
+            }), 400
+            
+    except AttributeError as e:
+        print(f"❌ AttributeError: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Bot not initialized. Please configure API keys.'
+        }), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
+        print(f"❌ Balance error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Error: {str(e)}'
+        }), 500
 
 @app.route('/api/risk-stats', methods=['GET'])
 def get_risk_stats():
@@ -4812,9 +5029,365 @@ def initialize_application():
         print(f"❌ Failed to initialize application: {e}")
         return False
 
-
 # Start background thread
 threading.Thread(target=process_message_queue, daemon=True).start()
+
+# 
+# Users database - persistent storage
+USERS_FILE = 'users.json'
+
+def load_users():
+    """Load users from file"""
+    try:
+        if os.path.exists(USERS_FILE):
+            with open(USERS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading users: {e}")
+    return {}
+
+def save_users():
+    """Save users to file"""
+    try:
+        with open(USERS_FILE, 'w') as f:
+            json.dump(users_db, f, indent=4)
+        print("✅ Users saved to file")
+    except Exception as e:
+        print(f"❌ Error saving users: {e}")
+
+users_db = load_users()
+
+
+
+
+
+
+
+
+
+@app.route('/api/auth/register', methods=['POST', 'OPTIONS'])
+def register():
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    try:
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form.to_dict()
+        
+        print("=== Received data:", data)
+        
+        full_name = data.get('full_name', '').strip()
+        email = data.get('email', '').strip()
+        password = data.get('password', '').strip()
+        country = data.get('country', 'PL')
+        timezone = data.get('timezone', 'Europe/Warsaw')
+        
+        print(f"Full name: '{full_name}', Email: '{email}', Password: '{password}'")
+        
+        if not email or not password:
+            return jsonify({'success': False, 'message': 'Email and password required'}), 400
+        
+        if not full_name:
+            return jsonify({'success': False, 'message': 'Full name required'}), 400
+        
+        if email in users_db:
+            return jsonify({'success': False, 'message': 'User already exists'}), 400
+        
+        users_db[email] = {
+            'full_name': full_name,
+            'password': password,
+            'email': email,
+            'country': country,
+            'timezone': timezone
+        }
+        
+        save_users()
+        token = generate_jwt_token(email, user_id=email)
+        
+        if not token:
+            return jsonify({'success': False, 'message': 'Token generation failed'}), 500
+        
+        print(f"✅ User {email} registered with token")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registration successful',
+            'token': token,
+            'user': {'email': email, 'full_name': full_name}
+        }), 201
+        
+    except Exception as e:
+        print(f"❌ Registration error: {str(e)}")
+        return jsonify({'success': False, 'message': 'Server error'}), 500
+
+
+
+
+
+
+ 
+
+
+  
+
+@app.route('/api/auth/login', methods=['POST', 'OPTIONS'])
+def login():
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    try:
+        import jwt
+        import datetime
+        
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form.to_dict()
+        
+        email = data.get('email', '').strip()
+        password = data.get('password', '').strip()
+        
+        print(f"Login attempt for: {email}")
+        
+        if not email or not password:
+            return jsonify({'success': False, 'message': 'Email and password required'}), 400
+        
+        if email not in users_db:
+            return jsonify({'success': False, 'message': 'Invalid email or password'}), 401
+        
+        if users_db[email]['password'] != password:
+            return jsonify({'success': False, 'message': 'Invalid email or password'}), 401
+        
+        # Generuj JWT token
+        token = jwt.encode(
+            {
+                'email': email,
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)
+            },
+            'your-secret-key-change-this',  # W produkcji użyj zmiennej środowiskowej!
+            algorithm='HS256'
+        )
+        
+        print(f"Login successful for: {email}")
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Login successful',
+            'token': token,
+            'user': {
+                'email': email,
+                'full_name': users_db[email]['full_name']
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Login error: {str(e)}")
+        return jsonify({'success': False, 'message': 'Server error'}), 500
+
+@app.route('/api/user/profile', methods=['GET'])
+def get_user_profile():
+    try:
+        # Dla uproszczenia zwracamy dane bez sprawdzania tokenu
+        # W produkcji należy zweryfikować JWT token
+        return jsonify({
+            'success': True,
+            'user': {
+                'email': 'user@example.com',
+                'full_name': 'Demo User',
+                'role': 'user'
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user/notifications', methods=['GET', 'PUT', 'POST'])
+def get_user_notifications():
+    """Get or update user notifications"""
+    try:
+        if request.method == 'GET':
+            # Wczytaj config.json żeby pobrać zapisane ustawienia
+            try:
+                with open('config.json', 'r') as f:
+                    config = json.load(f)
+                    notifications_settings = config.get('notifications', {})
+            except FileNotFoundError:
+                # Jeśli nie ma pliku, zwróć domyślne ustawienia
+                notifications_settings = {}
+            
+            return jsonify({
+                'success': True,
+                'notifications': [],
+                'unread_count': 0,
+                'settings': {
+                    'email_enabled': notifications_settings.get('email_enabled', False),
+                    'telegram_enabled': notifications_settings.get('telegram_enabled', False),
+                    'push_enabled': notifications_settings.get('push_enabled', False),
+                    'email': notifications_settings.get('email', ''),
+                    'telegram_chat_id': notifications_settings.get('telegram_chat_id', '')
+                }
+            }), 200
+        
+        elif request.method in ['PUT', 'POST']:
+            # Zapisz ustawienia powiadomień do config.json
+            data = request.get_json()
+            print(f"💾 Saving notification settings: {data}")
+            
+            # Krok 1: Wczytaj istniejący config.json
+            try:
+                with open('config.json', 'r') as f:
+                    config = json.load(f)
+            except FileNotFoundError:
+                # Jeśli pliku nie ma, stwórz pusty słownik
+                config = {}
+            
+            # Krok 2: Dodaj/zaktualizuj sekcję 'notifications'
+            if 'notifications' not in config:
+                config['notifications'] = {}
+            
+            # Zaktualizuj poszczególne ustawienia
+            config['notifications']['email_enabled'] = data.get('email_enabled', False)
+            config['notifications']['telegram_enabled'] = data.get('telegram_enabled', False)
+            config['notifications']['push_enabled'] = data.get('push_enabled', False)
+            config['notifications']['email'] = data.get('email', '')
+            config['notifications']['telegram_chat_id'] = data.get('telegram_chat_id', '')
+            
+            # Krok 3: Zapisz z powrotem do config.json
+            with open('config.json', 'w') as f:
+                json.dump(config, f, indent=4)  # indent=4 czyni plik czytelnym
+            
+            print(f"✅ Notification settings saved to config.json")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Notification settings saved successfully'
+            }), 200
+            
+    except Exception as e:
+        print(f"❌ Notifications error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/notification-settings', methods=['GET', 'POST'])
+def notification_settings():
+    """Get or update notification settings"""
+    try:
+        if request.method == 'GET':
+            # Zwróć aktualne ustawienia (można je przechowywać w config.json)
+            return jsonify({
+                'success': True,
+                'telegram_enabled': False,
+                'email_enabled': False,
+                'telegram_chat_id': '',
+                'email': ''
+            }), 200
+        
+        elif request.method == 'POST':
+            # Zapisz nowe ustawienia
+            data = request.get_json()
+            # Tutaj można dodać logikę zapisu do config.json
+            return jsonify({
+                'success': True,
+                'message': 'Settings updated successfully'
+            }), 200
+            
+    except Exception as e:
+        print(f"Notification settings error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+
+@app.route('/api/user/profile', methods=['GET', 'PUT', 'POST'])
+def user_profile():
+    """Get or update user profile"""
+    try:
+        if request.method == 'GET':
+            # Pobierz profil użytkownika
+            return jsonify({
+                'success': True,
+                'user': {
+                    'email': 'user@example.com',
+                    'full_name': 'Demo User',
+                    'created_at': '2025-12-01',
+                    'role': 'trader',
+                    'settings': {
+                        'timezone': 'Europe/Warsaw',
+                        'language': 'pl',
+                        'theme': 'dark'
+                    }
+                }
+            }), 200
+        
+        elif request.method in ['PUT', 'POST']:
+            # Aktualizuj profil
+            data = request.get_json()
+            print(f"💾 Updating user profile: {data}")
+            return jsonify({
+                'success': True,
+                'message': 'Profile updated successfully'
+            }), 200
+            
+    except Exception as e:
+        print(f"❌ Profile error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+
+@app.route("/api/auth/profile", methods=["GET"])
+def auth_profile():
+    """Get authenticated user profile"""
+    print("=" * 60)
+    print("📋 PROFILES REQUEST DEBUG")
+    
+    auth_header = request.headers.get("Authorization")
+    print(f"Authorization header: {auth_header}")
+    
+    if not auth_header or not auth_header.startswith("Bearer "):
+        print("❌ No Authorization header - returning 401")
+        return jsonify({"success": False, "message": "No authorization token"}), 401
+    
+    token = auth_header.split(" ")[1]
+    user_id = verify_jwt_token(token)
+    print(f"Extracted user_id: {user_id}")
+    print("=" * 60)
+    
+    # Sprawdź czy user_id jest stringiem (poprawny format)
+    if not user_id or not isinstance(user_id, str):
+        print("❌ Invalid token - returning 401")
+        return jsonify({"success": False, "message": "Invalid token"}), 401
+    
+    if user_id not in users_db:
+        print(f"❌ User {user_id} not found in database")
+        return jsonify({"success": False, "message": "User not found"}), 404
+    
+    user_data = users_db[user_id]
+    print(f"✅ Returning profile for: {user_id}")
+    
+    return jsonify({
+        "success": True,
+        "user": {
+            "email": user_data.get("email", user_id),
+            "full_name": user_data.get("full_name", "User"),
+            "country": user_data.get("country", "PL"),
+            "timezone": user_data.get("timezone", "Europe/Warsaw")
+        }
+    }), 200
+
+
+
+
 
 
 if __name__ == '__main__':

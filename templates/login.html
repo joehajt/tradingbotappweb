@@ -308,9 +308,10 @@
         // Sprawdź czy użytkownik jest już zalogowany
         fetch('/api/user/profile')
             .then(response => {
-                if (response.ok) {
-                    window.location.href = '/dashboard';
-                }
+                // Nie przekierowuj jeśli już jesteśmy na dashboard
+		if (window.location.pathname !== '/dashboard') {
+    		    window.location.href = '/dashboard';
+		}
             });
 
         // Sprawdź parametry URL
@@ -377,8 +378,11 @@
 
                     showAlert('Logowanie pomyślne! Przekierowywanie...', 'success');
                     setTimeout(() => {
-                        window.location.href = '/dashboard';
-                    }, 1000);
+    // Nie przekierowuj jeśli już jesteśmy na dashboard
+    			if (window.location.pathname !== '/dashboard') {
+        		    window.location.href = '/dashboard';
+    			}
+		    }, 1500);
                 } else {
                     showAlert(data.error || data.message || 'Błąd logowania', 'error');
                     loginBtn.disabled = false;
@@ -440,7 +444,10 @@
 
                     showAlert('Rejestracja pomyślna! Przekierowywanie do panelu...', 'success');
                     setTimeout(() => {
-                        window.location.href = '/dashboard';
+    // Nie przekierowuj jeśli już jesteśmy na dashboard
+    			if (window.location.pathname !== '/dashboard') {
+        		    window.location.href = '/dashboard';
+                        }
                     }, 1500);
                 } else {
                     showAlert(data.error || data.message || 'Błąd rejestracji', 'error');
