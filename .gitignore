@@ -64,3 +64,32 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+# Logi
+*.log
+bot_trading.log
+
+# Konfiguracja (wrażliwe dane)
+config.ini
+
+# Sesje Telegram
+telegram_sessions/
+*.session
+*.session-journal
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Środowisko
+.env
+venv/
+env/
