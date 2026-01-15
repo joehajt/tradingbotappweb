@@ -2938,18 +2938,34 @@ _____
 
         async function refreshProfiles() {
             try {
+                console.log('[PROFILES] Fetching profiles...');
                 const result = await apiRequest('profiles');
+
+                if (!result || !result.success) {
+                    throw new Error(result?.error || 'Unknown error loading profiles');
+                }
+
                 const tbody = document.getElementById('profiles-list');
                 tbody.innerHTML = '';
 
+                console.log('[PROFILES] Loaded profiles:', result.profiles);
+
+                if (!result.profiles || Object.keys(result.profiles).length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych profili. Zapisz swój pierwszy profil!</td></tr>';
+                    return;
+                }
+
                 Object.entries(result.profiles).forEach(([name, data]) => {
                     const row = tbody.insertRow();
-                    const riskEnabled = data.config.risk_management_enabled ? '✅' : '❌';
+                    const riskEnabled = data.config?.risk_management_enabled ? '✅' : '❌';
+                    const platform = data.config?.bybit_platform === 'testnet' ? '🎮 Testnet' : '💰 Mainnet';
+                    const accountType = data.config?.use_demo_account ? '🎮 Demo' : '💰 Live';
+
                     row.innerHTML = `
                         <td>${name}</td>
-                        <td>${formatDate(data.timestamp)}</td>
-                        <td>${data.config.bybit_platform === 'testnet' ? '🎮 Testnet' : '💰 Mainnet'}</td>
-                        <td>${data.config.use_demo_account ? '🎮 Demo' : '💰 Live'}</td>
+                        <td>${formatDate(data.updated_at || data.timestamp || data.created_at)}</td>
+                        <td>${platform}</td>
+                        <td>${accountType}</td>
                         <td>${riskEnabled}</td>
                         <td>
                             <button class="btn btn-sm btn-success" onclick="loadProfile('${name}')">📥 Wczytaj</button>
@@ -2957,9 +2973,24 @@ _____
                         </td>
                     `;
                 });
+
+                console.log('[PROFILES] Successfully loaded profiles table');
             } catch (error) {
-                console.error('Error loading profiles:', error);
-                showNotification('⚠️ Błąd ładowania profili', 'error');
+                console.error('[PROFILES] Error loading profiles:', error);
+
+                const tbody = document.getElementById('profiles-list');
+                let errorMessage = '⚠️ Błąd ładowania profili';
+
+                if (error.message.includes('Unauthorized')) {
+                    errorMessage = '🔒 Sesja wygasła. Zaloguj się ponownie.';
+                } else if (error.message.includes('JWT_SECRET_KEY')) {
+                    errorMessage = '⚙️ Błąd konfiguracji serwera. Skontaktuj się z administratorem.';
+                } else if (error.message) {
+                    errorMessage = `⚠️ ${error.message}`;
+                }
+
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: #f44336;">${errorMessage}</td></tr>`;
+                showNotification(errorMessage, 'error');
             }
         }
 
