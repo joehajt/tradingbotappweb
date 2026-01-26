@@ -937,21 +937,19 @@ class TelegramTradingBot:
             text_clean = ' '.join(text_clean.split())
 
             symbol_pattern = r'#?([A-Z0-9]+USDT?)\b'
-            # Priority 1: Look for position type directly with Entry Zone (e.g., "Short Entry Zone")
+
+            # CRITICAL: ONLY look for "Long Entry Zone" or "Short Entry Zone"
+            # This completely ignores "Long-Term" and "Short-Term" time indicators
             entry_with_position_pattern = r'\b(LONG|SHORT|Long|Short|long|short)\s+(?:Entry|entry|ENTRY)\s+(?:Zone|zone|ZONE)'
-            # Priority 2: Look for position type, but exclude "-Term" context (avoid "Long-Term", "Short-Term")
-            position_pattern = r'\b(LONG|SHORT|Long|Short|long|short)(?!\s*-\s*[Tt]erm)\b'
+
             entry_pattern = r'(?:Entry|entry|Wejście|ENTRY|Zone|zone|ZONE)[\s:]*([0-9]+\.?[0-9]*(?:\s*-\s*[0-9]+\.?[0-9]*)?)'
             target_pattern = r'(?:Target|target|TARGET|TP|tp|Cel|cel|CEL)[\s#]*(\d+)[\s:]*([0-9]+\.?[0-9]*)'
             sl_pattern = r'(?:Stop[\s-]?Loss|stop[\s-]?loss|SL|sl|STOP[\s-]?LOSS|Stop|stop|STOP)[\s:]*([0-9]+\.?[0-9]*)'
 
             symbol_match = re.search(symbol_pattern, text_clean)
-            # First try to find position type with Entry Zone
-            entry_with_position_match = re.search(entry_with_position_pattern, text_clean)
-            if entry_with_position_match:
-                position_match = entry_with_position_match  # Use position from "Short/Long Entry Zone"
-            else:
-                position_match = re.search(position_pattern, text_clean)  # Fallback to general pattern
+
+            # ONLY use "Entry Zone" pattern - ignore everything else
+            position_match = re.search(entry_with_position_pattern, text_clean)
             entry_match = re.search(entry_pattern, text_clean)
             target_matches = re.findall(target_pattern, text_clean)
             sl_match = re.search(sl_pattern, text_clean)
